@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Worker Profile - Elias Thorne</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "tertiary-container": "#976f46",
+                        "on-error": "#ffffff",
+                        "surface-variant": "#ebe1d9",
+                        "on-secondary-container": "#646453",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#4d453c",
+                        "surface-bright": "#fff8f4",
+                        "inverse-surface": "#352f2a",
+                        "secondary-container": "#e2e1cc",
+                        "tertiary-fixed": "#ffdcbd",
+                        "tertiary-fixed-dim": "#eebd8e",
+                        "on-background": "#1f1b16",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed": "#1c1c10",
+                        "on-secondary-fixed-variant": "#474839",
+                        "inverse-primary": "#dfc29f",
+                        "primary": "#715b3e",
+                        "surface-dim": "#e2d8d0",
+                        "surface-tint": "#715b3e",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#1f1b16",
+                        "surface-container-high": "#f1e6de",
+                        "on-primary": "#ffffff",
+                        "outline-variant": "#d1c4b9",
+                        "surface-container-low": "#fcf2e9",
+                        "primary-container": "#8b7355",
+                        "primary-fixed": "#fcdeba",
+                        "on-tertiary-container": "#0b0400",
+                        "secondary-fixed": "#e5e3cf",
+                        "outline": "#7f756b",
+                        "on-primary-container": "#0a0400",
+                        "on-tertiary-fixed-variant": "#61401b",
+                        "tertiary": "#7c5730",
+                        "primary-fixed-dim": "#dfc29f",
+                        "on-primary-fixed-variant": "#574329",
+                        "surface": "#fff8f4",
+                        "on-tertiary-fixed": "#2c1600",
+                        "inverse-on-surface": "#f9efe7",
+                        "background": "#fff8f4",
+                        "on-primary-fixed": "#281903",
+                        "surface-container": "#f7ece4",
+                        "surface-container-highest": "#ebe1d9",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed-dim": "#c9c7b4",
+                        "secondary": "#5f5f4f"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0px",
+                        "lg": "0px",
+                        "xl": "0px",
+                        "full": "9999px"
+                    },
+                    spacing: {
+                        "unit": "4px",
+                        "gutter": "24px",
+                        "indent": "32px",
+                        "margin": "48px"
+                    },
+                    fontFamily: {
+                        "body-md": ["Newsreader"],
+                        "headline-lg": ["Newsreader"],
+                        "headline-xl": ["Newsreader"],
+                        "label-italic": ["Newsreader"],
+                        "label-caps": ["Newsreader"],
+                        "body-lg": ["Newsreader"],
+                        "headline-md": ["Newsreader"]
+                    },
+                    fontSize: {
+                        "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "headline-lg": ["32px", { lineHeight: "1.2", fontWeight: "500" }],
+                        "headline-xl": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "label-italic": ["14px", { lineHeight: "1", fontWeight: "400", fontStyle: "italic" }],
+                        "label-caps": ["12px", { lineHeight: "1", letterSpacing: "0.1em", fontWeight: "700" }],
+                        "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                        "headline-md": ["24px", { lineHeight: "1.3", fontWeight: "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #f0ebe0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+        }
+        .ink-border {
+            border-color: #8b7355;
+        }
+        .ink-text {
+            color: #1f1b16;
+        }
+        .ink-accent {
+            color: #8b7355;
+        }
+    </style>
+</head>
+<body class="font-body-md text-body-md ink-text min-h-screen flex flex-col antialiased">
+<!-- Top Navigation -->
+<nav class="flex justify-between items-center w-full px-12 py-6 border-b ink-border bg-[#f4f1ea]">
+<div class="font-headline-lg text-headline-lg font-black uppercase ink-accent tracking-tighter">WORKER ARCHIVE</div>
+<div class="flex gap-8">
+<a class="font-label-caps text-label-caps ink-accent opacity-70 hover:bg-[#ede8df] px-2 py-1 transition-colors" href="#">CATALOGUE</a>
+<a class="font-label-caps text-label-caps ink-accent border-b-2 ink-border pb-1 hover:bg-[#ede8df] px-2 py-1 transition-colors" href="#">ENTRIES</a>
+<a class="font-label-caps text-label-caps ink-accent opacity-70 hover:bg-[#ede8df] px-2 py-1 transition-colors" href="#">LEDGER</a>
+<a class="font-label-caps text-label-caps ink-accent opacity-70 hover:bg-[#ede8df] px-2 py-1 transition-colors" href="#">OFFICE</a>
+</div>
+<button class="font-label-caps text-label-caps ink-accent border ink-border px-4 py-2 hover:bg-[#ede8df] transition-colors uppercase tracking-widest">SIGNATURE</button>
+</nav>
+<div class="flex flex-1">
+<!-- Main Content Canvas -->
+<main class="flex-1 p-margin max-w-7xl mx-auto w-full">
+<header class="mb-gutter flex justify-between items-end border-b ink-border pb-4">
+<div>
+<span class="font-label-caps text-label-caps ink-accent block mb-2">ENTRY NO. 4029</span>
+<h1 class="font-headline-xl text-headline-xl">Dossier: Elias Thorne</h1>
+</div>
+<div class="font-label-italic text-label-italic text-right">
+                    Transcribed: 14th Oct, 1892
+                </div>
+</header>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-margin">
+<!-- Left Column: Portrait & Metrics -->
+<aside class="md:col-span-4 border-r ink-border pr-margin flex flex-col gap-8">
+<div class="text-center">
+<img alt="Sepia-toned portrait of a serious man in Victorian clothing, high contrast, textured" class="w-48 h-48 rounded-full mx-auto border-2 ink-border object-cover grayscale sepia mb-6 p-1" data-alt="Sepia-toned portrait of a serious man in Victorian clothing, high contrast, textured" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTGiyTXY3eBivlJnBW4RtHi924n4w0bkb-B9FZlNXoL3rKlmvbIQxQr3UN9GU_dCDrvLBb4bYAhOJhfNNqz_wnG6B8TSHZJHYXIdpWCRniaCPcWlxO8udZuVZmxV4aZpux2LlA4oroYBaRkd1K9Cv0YGCvH6AZ-aLVwZRBFuoN0Yj2ipTycHO2JYSIppNC-dDimzVwGLmn6pRSAUpNVWeA-wGV-oIMAhUi47t7c3g0-42fXD13JuhwU3v2XozgPDxlsBcKP0QudNQ"/>
+<h2 class="font-headline-lg text-headline-lg mb-1">Elias Thorne</h2>
+<div class="font-label-caps text-label-caps ink-accent mb-4">MASTER HOROLOGIST</div>
+<div class="font-body-md text-body-md uppercase tracking-wider border-y ink-border py-2 mx-8">
+                            Status: Active
+                        </div>
+</div>
+<div class="space-y-6 pt-4">
+<h3 class="font-label-caps text-label-caps border-b ink-border pb-2 mb-4">VITAL METRICS</h3>
+<div>
+<div class="flex justify-between font-label-italic text-label-italic mb-1">
+<span>Mood</span>
+<span>74%</span>
+</div>
+<div class="h-4 border-b border-t ink-border relative bg-surface-variant/30">
+<div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 w-[74%] border-r ink-border"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-italic text-label-italic mb-1">
+<span>Hope</span>
+<span>42%</span>
+</div>
+<div class="h-4 border-b border-t ink-border relative bg-surface-variant/30">
+<div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 w-[42%] border-r ink-border"></div>
+</div>
+</div>
+<div>
+<div class="flex justify-between font-label-italic text-label-italic mb-1">
+<span>Grievance</span>
+<span>61%</span>
+</div>
+<div class="h-4 border-b border-t ink-border relative bg-surface-variant/30">
+<div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 w-[61%] border-r ink-border"></div>
+</div>
+</div>
+</div>
+<div class="mt-auto pt-8 font-label-italic text-label-italic text-center text-on-surface-variant">
+                        Last Active: Section IV, Lower Catacombs
+                    </div>
+</aside>
+<!-- Right Column: Tabs & Narrative -->
+<div class="md:col-span-8 flex flex-col">
+<!-- Text Tabs -->
+<div class="flex gap-8 border-b ink-border mb-8 pb-2">
+<a class="font-label-caps text-label-caps ink-text border-b-2 ink-border pb-2 -mb-[10px]" href="#">NARRATIVE LOG</a>
+<a class="font-label-caps text-label-caps ink-text opacity-60 hover:opacity-100 transition-opacity pb-2" href="#">WORK ASSIGNMENT</a>
+<a class="font-label-caps text-label-caps ink-text opacity-60 hover:opacity-100 transition-opacity pb-2" href="#">HEALTH REPORT</a>
+<a class="font-label-caps text-label-caps ink-text opacity-60 hover:opacity-100 transition-opacity pb-2" href="#">BACKGROUND DOSSIER</a>
+</div>
+<!-- Narrative Feed -->
+<div class="space-y-12">
+<!-- Entry 1 -->
+<article class="pl-6 border-l ink-border">
+<div class="font-label-caps text-label-caps mb-4 text-on-surface-variant flex items-center gap-4">
+<span>14TH OCT, 1892</span>
+<span class="h-px bg-outline-variant flex-1"></span>
+</div>
+<p class="font-body-lg text-body-lg mb-4 text-justify">
+                                Subject was observed muttering over the mainspring apparatus in Sector 7 for an uninterrupted period of four hours. He appeared deeply agitated by the calibration variances, claiming the mechanisms were "out of step with the earth's natural resonance." 
+                            </p>
+<p class="font-body-lg text-body-lg text-justify indent-indent">
+                                His output, however, remains exemplary. The chronometers produced during this shift exhibited an unprecedented accuracy margin. Suggest monitoring for signs of fatigue, but do not interrupt current workflow.
+                            </p>
+</article>
+<!-- Entry 2 -->
+<article class="pl-6 border-l ink-border">
+<div class="font-label-caps text-label-caps mb-4 text-on-surface-variant flex items-center gap-4">
+<span>12TH OCT, 1892</span>
+<span class="h-px bg-outline-variant flex-1"></span>
+</div>
+<p class="font-body-lg text-body-lg mb-4 text-justify">
+                                A minor altercation occurred in the mess hall. Thorne refused his rations, stating the gruel was contaminated with "industrial humors." He instead traded two minor cog-assemblies with a junior mechanic for a piece of dried fruit and a clean cloth.
+                            </p>
+<div class="border ink-border p-4 mt-6 bg-surface-variant/20 italic font-body-md text-body-md">
+<span class="font-label-caps text-label-caps not-italic block mb-2 ink-accent">OVERSEER NOTE:</span>
+                                Reprimand issued to junior mechanic for unauthorized trading. Thorne's eccentricities are to be tolerated only so long as quotas are met.
+                            </div>
+</article>
+<!-- Entry 3 -->
+<article class="pl-6 border-l ink-border opacity-80">
+<div class="font-label-caps text-label-caps mb-4 text-on-surface-variant flex items-center gap-4">
+<span>08TH OCT, 1892</span>
+<span class="h-px bg-outline-variant flex-1"></span>
+</div>
+<p class="font-body-lg text-body-lg text-justify">
+                                Transferred from the Upper Levels. Adjustment period initiated. Initial assessments indicate a high aptitude for delicate machinery but a concerning tendency towards melancholic introspection.
+                            </p>
+</article>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
