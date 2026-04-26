@@ -8,23 +8,49 @@
 package main
 
 import (
+	"bufio"
 	"flag"
-	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"worker-agent/internal/city"
 	"worker-agent/internal/llm"
 	"worker-agent/internal/server"
 )
 
+func loadEnv(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		k, v, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		if os.Getenv(k) == "" {
+			os.Setenv(k, v)
+		}
+	}
+}
+
 func main() {
+	loadEnv(".env")
+
 	port := flag.Int("port", 8080, "HTTP 服务端口")
 	dataDir := flag.String("data", "./data", "数据目录（存放工人 DB 文件）")
 	cityURL := flag.String("city", "", "城市 API 地址（空则启用 mock 模式）")
-	llmURL := flag.String("llm-url", "https://api.minimax.chat", "LLM API 地址")
+	llmURL := flag.String("llm-url", "https://api.minimaxi.com", "LLM API 地址")
 	llmKey := flag.String("llm-key", "", "LLM API Key（默认读 LLM_API_KEY 环境变量）")
-	llmModel := flag.String("llm-model", "MiniMax-Text-01", "LLM 模型名称")
+	llmModel := flag.String("llm-model", "MiniMax-M2.7", "LLM 模型名称")
 	flag.Parse()
 
 	// ── LLM 客户端 ──
@@ -32,11 +58,12 @@ func main() {
 	if apiKey == "" {
 		apiKey = os.Getenv("LLM_API_KEY")
 	}
+	var llmClient llm.Client
 	if apiKey == "" {
-		fmt.Fprintln(os.Stderr, "错误: 需要 LLM API Key（-llm-key 或 LLM_API_KEY 环境变量）")
-		os.Exit(1)
+		log.Println("[main] LLM API Key 未配置，工人推理功能不可用（UI 和 API 正常）")
+	} else {
+		llmClient = llm.NewMiniMax(*llmURL, apiKey, *llmModel)
 	}
-	llmClient := llm.NewMiniMax(*llmURL, apiKey, *llmModel)
 
 	// ── 城市 API ──
 	var cityAPI *city.CityAPI

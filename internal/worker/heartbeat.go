@@ -35,14 +35,18 @@ type WakeupSignal struct {
 
 func RunHeartbeat(ctx context.Context, database *db.Database, cityAPI *city.CityAPI, llmClient llm.Client, workerID string, wakeupCh chan<- WakeupSignal, wg *sync.WaitGroup) {
 	defer wg.Done()
+	log.Printf("[心跳/%s] 协程启动", workerID)
+
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ctx.Done():
+			log.Printf("[心跳/%s] 协程退出", workerID)
 			return
 		case <-ticker.C:
+			log.Printf("[心跳/%s] 定时扫描心跳计划", workerID)
 			processHeartbeats(database, cityAPI, llmClient, workerID, wakeupCh)
 		}
 	}

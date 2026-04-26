@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Worker Archive — Catalogue</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+    theme: {
+        extend: {
+            colors: {
+                "primary-container": "#8b7355",
+                "surface-variant": "#ebe1d9",
+                "on-surface-variant": "#4d453c",
+                "on-surface": "#1f1b16",
+                "outline-variant": "#d1c4b9",
+                "outline": "#7f756b"
+            },
+            fontFamily: {
+                "body-md": ["Newsreader"],
+                "headline-lg": ["Newsreader"],
+                "headline-xl": ["Newsreader"],
+                "label-italic": ["Newsreader"],
+                "label-caps": ["Newsreader"],
+                "body-lg": ["Newsreader"],
+                "headline-md": ["Newsreader"]
+            },
+            fontSize: {
+                "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                "headline-lg": ["32px", { lineHeight: "1.2", fontWeight: "500" }],
+                "headline-xl": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "600" }],
+                "label-italic": ["14px", { lineHeight: "1", fontWeight: "400", fontStyle: "italic" }],
+                "label-caps": ["12px", { lineHeight: "1", letterSpacing: "0.1em", fontWeight: "700" }],
+                "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                "headline-md": ["24px", { lineHeight: "1.3", fontWeight: "500" }]
+            }
+        }
+    }
+}
+</script>
+<style>
+body {
+    background-color: #f0ebe0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+.ink-border { border-color: #8b7355; }
+.ink-text { color: #1f1b16; }
+.ink-accent { color: #8b7355; }
+</style>
+</head>
+<body class="font-body-md text-body-md ink-text min-h-screen flex flex-col antialiased">
+
+<!-- 导航栏 -->
+<nav class="flex justify-between items-center w-full px-12 py-6 border-b ink-border bg-[#f4f1ea]">
+    <div class="font-headline-lg text-headline-lg font-black uppercase ink-accent tracking-tighter">WORKER ARCHIVE</div>
+    <div class="flex gap-8">
+        <a class="font-label-caps text-label-caps ink-accent border-b-2 ink-border pb-1" href="/">CATALOGUE</a>
+    </div>
+</nav>
+
+<!-- 主体 -->
+<main class="flex-1 p-12 max-w-7xl mx-auto w-full">
+    <header class="mb-8 border-b ink-border pb-4">
+        <span class="font-label-caps text-label-caps ink-accent block mb-2">CITY REGISTRY</span>
+        <h1 class="font-headline-xl text-headline-xl">Worker Catalogue</h1>
+    </header>
+
+    {{if not .Workers}}
+    <div class="text-center py-20">
+        <p class="font-headline-md text-headline-md ink-accent mb-4">No Workers Registered</p>
+        <p class="font-body-lg text-body-lg text-on-surface-variant">Use the API to create a worker:<br/>
+        <code class="text-sm bg-surface-variant px-2 py-1 mt-2 inline-block">POST /api/workers</code></p>
+    </div>
+    {{else}}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {{range .Workers}}
+        <a href="/worker/{{.Name}}" class="block border ink-border p-6 bg-[#f4f1ea] hover:bg-[#ede8df] transition-colors group">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h2 class="font-headline-md text-headline-md group-hover:ink-accent transition-colors">{{.Name}}</h2>
+                    <div class="font-label-caps text-label-caps ink-accent mt-1">{{.Occupation}}</div>
+                </div>
+                <div class="font-label-caps text-label-caps px-2 py-1 border ink-border {{if eq .Status "running"}}bg-primary-container/10{{else}}bg-red-100{{end}}">
+                    {{.Status}}
+                </div>
+            </div>
+
+            <div class="space-y-3 mt-6">
+                <div>
+                    <div class="flex justify-between font-label-italic text-label-italic mb-1">
+                        <span>Mood</span><span>{{.Mood}}</span>
+                    </div>
+                    <div class="h-3 border ink-border relative bg-surface-variant/30">
+                        <div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 border-r ink-border" style="width: {{moodPct .Mood}}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between font-label-italic text-label-italic mb-1">
+                        <span>Hope</span><span>{{.Hope}}</span>
+                    </div>
+                    <div class="h-3 border ink-border relative bg-surface-variant/30">
+                        <div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 border-r ink-border" style="width: {{moodPct .Hope}}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between font-label-italic text-label-italic mb-1">
+                        <span>Grievance</span><span>{{.Grievance}}</span>
+                    </div>
+                    <div class="h-3 border ink-border relative bg-surface-variant/30">
+                        <div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 border-r ink-border" style="width: {{moodPct .Grievance}}%"></div>
+                    </div>
+                </div>
+            </div>
+        </a>
+        {{end}}
+    </div>
+    {{end}}
+</main>
+
+<footer class="text-center py-6 border-t ink-border font-label-italic text-label-italic text-on-surface-variant">
+    New London Worker Archive System
+</footer>
+</body>
+</html>

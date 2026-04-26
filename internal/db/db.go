@@ -35,6 +35,7 @@ type Soul struct {
 	SpeechStyle string
 	ValuesDesc  string
 	Family      string
+	Avatar      string
 	Mood        int
 	Hope        int
 	Grievance   int
@@ -108,6 +109,7 @@ func (d *Database) createTables() error {
 		speech_style TEXT,
 		values_desc  TEXT,
 		family       TEXT,
+		avatar       TEXT DEFAULT '',
 		mood         INTEGER DEFAULT 50,
 		hope         INTEGER DEFAULT 50,
 		grievance    INTEGER DEFAULT 0
@@ -153,10 +155,10 @@ func (d *Database) createTables() error {
 func (d *Database) GetSoul() (Soul, error) {
 	var s Soul
 	err := d.db.QueryRow(`SELECT name, occupation, background, personality,
-		speech_style, values_desc, family, mood, hope, grievance
+		speech_style, values_desc, family, avatar, mood, hope, grievance
 		FROM soul WHERE id = 1`).Scan(
 		&s.Name, &s.Occupation, &s.Background, &s.Personality,
-		&s.SpeechStyle, &s.ValuesDesc, &s.Family,
+		&s.SpeechStyle, &s.ValuesDesc, &s.Family, &s.Avatar,
 		&s.Mood, &s.Hope, &s.Grievance,
 	)
 	return s, err
@@ -184,10 +186,10 @@ func (d *Database) UpdateSoul(updates []SoulUpdate) error {
 
 func (d *Database) InitSoul(s Soul) error {
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO soul
-		(id, name, occupation, background, personality, speech_style, values_desc, family, mood, hope, grievance)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(id, name, occupation, background, personality, speech_style, values_desc, family, avatar, mood, hope, grievance)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.Name, s.Occupation, s.Background, s.Personality,
-		s.SpeechStyle, s.ValuesDesc, s.Family,
+		s.SpeechStyle, s.ValuesDesc, s.Family, s.Avatar,
 		s.Mood, s.Hope, s.Grievance,
 	)
 	return err
@@ -272,7 +274,11 @@ func (d *Database) GetPendingWakeups(now string) ([]WakeupEntry, error) {
 func (d *Database) InsertWakeup(datetime string, reason string) error {
 	t, err := time.Parse(time.RFC3339, datetime)
 	if err != nil {
-		return fmt.Errorf("时间格式错误: %w", err)
+		t, err = time.ParseInLocation("2006-01-02T15:04:05", datetime, time.Local)
+		if err != nil {
+			return fmt.Errorf("时间格式错误: %w", err)
+		}
+		datetime = t.Format(time.RFC3339)
 	}
 	if t.Before(time.Now()) {
 		return fmt.Errorf("拒绝过去的时间: %s", datetime)
@@ -376,8 +382,51 @@ func (d *Database) GetLatestSummary() (string, error) {
 //  Narratives
 // ================================================================
 
+type Narrative struct {
+	ID        int64
+	Timestamp string
+	Content   string
+}
+
 func (d *Database) InsertNarrative(content string) error {
 	_, err := d.db.Exec("INSERT INTO narratives (timestamp, content) VALUES (?, ?)",
 		time.Now().Format(time.RFC3339), content)
 	return err
+}
+
+func (d *Database) GetRecentNarratives(n int) ([]Narrative, error) {
+	rows, err := d.db.Query("SELECT id, timestamp, content FROM narratives ORDER BY id DESC LIMIT ?", n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var narratives []Narrative
+	for rows.Next() {
+		var n Narrative
+		if err := rows.Scan(&n.ID, &n.Timestamp, &n.Content); err != nil {
+			return nil, err
+		}
+		narratives = append(narratives, n)
+	}
+	return narratives, rows.Err()
+}
+
+func (d *Database) GetRecentHeartbeats(n int) ([]HeartbeatEntry, error) {
+	rows, err := d.db.Query(
+		`SELECT id, time, date, task, status FROM heartbeat_schedule ORDER BY date DESC, time DESC LIMIT ?`, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []HeartbeatEntry
+	for rows.Next() {
+		var e HeartbeatEntry
+		if err := rows.Scan(&e.ID, &e.Time, &e.Date, &e.Task, &e.Status); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
 }

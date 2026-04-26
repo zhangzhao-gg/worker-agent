@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Worker Profile — {{.Soul.Name}}</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400&display=swap" rel="stylesheet"/>
+<script>
+tailwind.config = {
+    theme: {
+        extend: {
+            colors: {
+                "primary-container": "#8b7355",
+                "surface-variant": "#ebe1d9",
+                "on-surface-variant": "#4d453c",
+                "on-surface": "#1f1b16",
+                "outline-variant": "#d1c4b9",
+                "outline": "#7f756b"
+            },
+            fontFamily: {
+                "body-md": ["Newsreader"],
+                "headline-lg": ["Newsreader"],
+                "headline-xl": ["Newsreader"],
+                "label-italic": ["Newsreader"],
+                "label-caps": ["Newsreader"],
+                "body-lg": ["Newsreader"],
+                "headline-md": ["Newsreader"]
+            },
+            fontSize: {
+                "body-md": ["16px", { lineHeight: "1.6", fontWeight: "400" }],
+                "headline-lg": ["32px", { lineHeight: "1.2", fontWeight: "500" }],
+                "headline-xl": ["48px", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "600" }],
+                "label-italic": ["14px", { lineHeight: "1", fontWeight: "400", fontStyle: "italic" }],
+                "label-caps": ["12px", { lineHeight: "1", letterSpacing: "0.1em", fontWeight: "700" }],
+                "body-lg": ["18px", { lineHeight: "1.6", fontWeight: "400" }],
+                "headline-md": ["24px", { lineHeight: "1.3", fontWeight: "500" }]
+            }
+        }
+    }
+}
+</script>
+<style>
+body {
+    background-color: #f0ebe0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+.ink-border { border-color: #8b7355; }
+.ink-text { color: #1f1b16; }
+.ink-accent { color: #8b7355; }
+.tab-active { border-bottom: 2px solid #8b7355; opacity: 1; }
+</style>
+</head>
+<body class="font-body-md text-body-md ink-text min-h-screen flex flex-col antialiased">
+
+<!-- 导航栏 -->
+<nav class="flex justify-between items-center w-full px-12 py-6 border-b ink-border bg-[#f4f1ea]">
+    <div class="font-headline-lg text-headline-lg font-black uppercase ink-accent tracking-tighter">WORKER ARCHIVE</div>
+    <div class="flex gap-8">
+        <a class="font-label-caps text-label-caps ink-accent opacity-70 hover:opacity-100 transition-opacity" href="/">CATALOGUE</a>
+        <span class="font-label-caps text-label-caps ink-accent border-b-2 ink-border pb-1">ENTRIES</span>
+    </div>
+</nav>
+
+<div class="flex flex-1">
+<main class="flex-1 p-12 max-w-7xl mx-auto w-full">
+    <!-- 页头 -->
+    <header class="mb-8 flex justify-between items-end border-b ink-border pb-4">
+        <div>
+            <span class="font-label-caps text-label-caps ink-accent block mb-2">
+                WORKER DOSSIER &middot; {{.Status}}
+            </span>
+            <h1 class="font-headline-xl text-headline-xl">Dossier: {{.Soul.Name}}</h1>
+        </div>
+        <a href="/" class="font-label-caps text-label-caps ink-accent opacity-70 hover:opacity-100 border ink-border px-4 py-2">&larr; BACK</a>
+    </header>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-12">
+        <!-- 左栏：身份 + 情绪 -->
+        <aside class="md:col-span-4 md:border-r ink-border md:pr-12 flex flex-col gap-8">
+            <div class="text-center">
+                {{if .Soul.Avatar}}
+                <img alt="Portrait of {{.Soul.Name}}" class="w-48 h-48 rounded-full mx-auto border-2 ink-border object-cover grayscale sepia mb-6 p-1" src="{{.Soul.Avatar}}"/>
+                {{else}}
+                <div class="w-48 h-48 rounded-full mx-auto border-2 ink-border flex items-center justify-center bg-surface-variant/30 mb-6">
+                    <span class="font-headline-xl text-[64px] ink-accent">{{slice .Soul.Name 0 1}}</span>
+                </div>
+                {{end}}
+                <h2 class="font-headline-lg text-headline-lg mb-1">{{.Soul.Name}}</h2>
+                <div class="font-label-caps text-label-caps ink-accent mb-4">{{.Soul.Occupation}}</div>
+                <div class="font-body-md text-body-md uppercase tracking-wider border-y ink-border py-2 mx-8">
+                    Status: {{.Status}}
+                </div>
+            </div>
+
+            <!-- 情绪指标 -->
+            <div class="space-y-6 pt-4">
+                <h3 class="font-label-caps text-label-caps border-b ink-border pb-2 mb-4">VITAL METRICS</h3>
+                <div>
+                    <div class="flex justify-between font-label-italic text-label-italic mb-1">
+                        <span>Mood</span><span>{{.Soul.Mood}}</span>
+                    </div>
+                    <div class="h-4 border ink-border relative bg-surface-variant/30">
+                        <div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 border-r ink-border" style="width: {{moodPct .Soul.Mood}}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between font-label-italic text-label-italic mb-1">
+                        <span>Hope</span><span>{{.Soul.Hope}}</span>
+                    </div>
+                    <div class="h-4 border ink-border relative bg-surface-variant/30">
+                        <div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 border-r ink-border" style="width: {{moodPct .Soul.Hope}}%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex justify-between font-label-italic text-label-italic mb-1">
+                        <span>Grievance</span><span>{{.Soul.Grievance}}</span>
+                    </div>
+                    <div class="h-4 border ink-border relative bg-surface-variant/30">
+                        <div class="absolute top-0 left-0 h-full bg-primary-container opacity-40 border-r ink-border" style="width: {{moodPct .Soul.Grievance}}%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 背景信息 -->
+            <div class="space-y-4 pt-4">
+                <h3 class="font-label-caps text-label-caps border-b ink-border pb-2 mb-4">BACKGROUND DOSSIER</h3>
+                {{if .Soul.Background}}
+                <div>
+                    <span class="font-label-caps text-label-caps ink-accent block mb-1">BACKGROUND</span>
+                    <p class="font-body-md text-body-md">{{.Soul.Background}}</p>
+                </div>
+                {{end}}
+                {{if .Soul.Personality}}
+                <div>
+                    <span class="font-label-caps text-label-caps ink-accent block mb-1">PERSONALITY</span>
+                    <p class="font-body-md text-body-md">{{.Soul.Personality}}</p>
+                </div>
+                {{end}}
+                {{if .Soul.SpeechStyle}}
+                <div>
+                    <span class="font-label-caps text-label-caps ink-accent block mb-1">SPEECH STYLE</span>
+                    <p class="font-body-md text-body-md">{{.Soul.SpeechStyle}}</p>
+                </div>
+                {{end}}
+                {{if .Soul.ValuesDesc}}
+                <div>
+                    <span class="font-label-caps text-label-caps ink-accent block mb-1">VALUES</span>
+                    <p class="font-body-md text-body-md">{{.Soul.ValuesDesc}}</p>
+                </div>
+                {{end}}
+                {{if .Soul.Family}}
+                <div>
+                    <span class="font-label-caps text-label-caps ink-accent block mb-1">FAMILY</span>
+                    <p class="font-body-md text-body-md">{{.Soul.Family}}</p>
+                </div>
+                {{end}}
+            </div>
+        </aside>
+
+        <!-- 右栏：标签页内容 -->
+        <div class="md:col-span-8 flex flex-col">
+            <!-- 标签栏 -->
+            <div class="flex gap-8 border-b ink-border mb-8 pb-2">
+                <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "narrative"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=narrative">NARRATIVE LOG</a>
+                <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "memory"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=memory">PRIVATE MEMORY</a>
+                <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "event"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=event">CITY EVENTS</a>
+                <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "schedule"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=schedule">WORK SCHEDULE</a>
+            </div>
+
+            <!-- NARRATIVE LOG -->
+            {{if eq .Tab "narrative"}}
+            <div class="space-y-10">
+                {{if not .Narratives}}
+                <p class="font-body-lg text-body-lg text-on-surface-variant italic">No narratives recorded yet.</p>
+                {{else}}
+                {{range .Narratives}}
+                <article class="pl-6 border-l ink-border">
+                    <div class="font-label-caps text-label-caps mb-3 text-on-surface-variant flex items-center gap-4">
+                        <span>{{fmtTime .Timestamp}}</span>
+                        <span class="h-px bg-outline-variant flex-1"></span>
+                    </div>
+                    <p class="font-body-lg text-body-lg text-justify">{{.Content}}</p>
+                </article>
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+
+            <!-- PRIVATE MEMORY -->
+            {{if eq .Tab "memory"}}
+            <div class="space-y-10">
+                {{if not .Memories}}
+                <p class="font-body-lg text-body-lg text-on-surface-variant italic">No memories recorded yet.</p>
+                {{else}}
+                {{range .Memories}}
+                <article class="pl-6 border-l ink-border">
+                    <div class="font-label-caps text-label-caps mb-3 text-on-surface-variant flex items-center gap-4">
+                        <span>{{fmtTime .Timestamp}}</span>
+                        <span class="font-label-caps text-label-caps ink-accent px-2 py-0.5 border ink-border">{{.Type}}</span>
+                        <span class="h-px bg-outline-variant flex-1"></span>
+                    </div>
+                    <p class="font-body-lg text-body-lg text-justify">{{.Content}}</p>
+                </article>
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+
+            <!-- CITY EVENTS -->
+            {{if eq .Tab "event"}}
+            <div class="space-y-10">
+                {{if not .Events}}
+                <p class="font-body-lg text-body-lg text-on-surface-variant italic">No events received yet.</p>
+                {{else}}
+                {{range .Events}}
+                <article class="pl-6 border-l ink-border {{if eq .Processed 1}}opacity-60{{end}}">
+                    <div class="font-label-caps text-label-caps mb-3 text-on-surface-variant flex items-center gap-4">
+                        <span>{{fmtTime .Timestamp}}</span>
+                        {{if eq .Processed 0}}
+                        <span class="font-label-caps text-label-caps px-2 py-0.5 border border-red-400 text-red-700">UNPROCESSED</span>
+                        {{else}}
+                        <span class="font-label-caps text-label-caps px-2 py-0.5 border ink-border text-on-surface-variant">PROCESSED</span>
+                        {{end}}
+                        <span class="h-px bg-outline-variant flex-1"></span>
+                    </div>
+                    <p class="font-body-lg text-body-lg text-justify">{{.Content}}</p>
+                </article>
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+
+            <!-- WORK SCHEDULE -->
+            {{if eq .Tab "schedule"}}
+            <div class="space-y-1">
+                {{if not .Heartbeats}}
+                <p class="font-body-lg text-body-lg text-on-surface-variant italic">No schedule entries yet.</p>
+                {{else}}
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b ink-border">
+                            <th class="font-label-caps text-label-caps text-left py-3 pr-4">DATE</th>
+                            <th class="font-label-caps text-label-caps text-left py-3 pr-4">TIME</th>
+                            <th class="font-label-caps text-label-caps text-left py-3 pr-4">TASK</th>
+                            <th class="font-label-caps text-label-caps text-left py-3">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Heartbeats}}
+                        <tr class="border-b border-outline-variant/50">
+                            <td class="font-body-md text-body-md py-3 pr-4">{{.Date}}</td>
+                            <td class="font-body-md text-body-md py-3 pr-4">{{.Time}}</td>
+                            <td class="font-body-md text-body-md py-3 pr-4">{{.Task}}</td>
+                            <td class="py-3">
+                                <span class="font-label-caps text-label-caps px-2 py-0.5 border
+                                    {{if eq .Status "done"}}ink-border text-on-surface-variant
+                                    {{else if eq .Status "pending"}}border-amber-500 text-amber-700
+                                    {{else}}border-red-400 text-red-700{{end}}">
+                                    {{.Status}}
+                                </span>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{end}}
+            </div>
+            {{end}}
+
+        </div>
+    </div>
+</main>
+</div>
+
+<footer class="text-center py-6 border-t ink-border font-label-italic text-label-italic text-on-surface-variant">
+    New London Worker Archive System
+</footer>
+</body>
+</html>

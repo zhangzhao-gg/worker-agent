@@ -9,6 +9,7 @@ internal/llm/    - LLM 抽象层，Client 接口 + MiniMax 实现
 internal/engine/ - LLM 推理引擎，agent loop + tool dispatch + 压缩 + todo
 internal/worker/ - 双协程，心跳协程（身体）+ 唤醒调度协程（大脑入口）
 internal/server/ - HTTP API + 工人生命周期管理，DB 持久化重启自动恢复
+internal/web/    - Web UI，embed 内嵌模板，工人列表 + 详情档案页
 docs/            - 设计文档，PRD + 业务层 + 推理引擎 + s_full.py 参考实现
 </directory>
 

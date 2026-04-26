@@ -8,6 +8,8 @@
 package engine
 
 import (
+	"log"
+
 	"worker-agent/internal/city"
 	"worker-agent/internal/db"
 	"worker-agent/internal/llm"
@@ -41,11 +43,19 @@ func New(database *db.Database, cityAPI *city.CityAPI, llmClient llm.Client) *En
 // ================================================================
 
 func (e *Engine) Run(trigger string, ctx RunContext) error {
+	log.Printf("[engine] Run 开始: trigger=%s, soul=%s", trigger, ctx.Soul.Name)
+
+	if e.llm == nil {
+		log.Println("[engine] LLM 客户端为 nil，跳过推理")
+		return nil
+	}
+
 	systemPrompt := buildSystemPrompt(ctx)
 	initialMsg := buildInitialMessage(trigger, ctx)
 	tools := loadToolDefs()
 	todo := NewTodoManager()
 	handlers := e.buildHandlers(todo)
 
+	log.Printf("[engine] 启动 agentLoop, tools=%d, initialMsg长度=%d", len(tools), len(initialMsg))
 	return agentLoop(e.llm, systemPrompt, initialMsg, tools, handlers, todo)
 }
