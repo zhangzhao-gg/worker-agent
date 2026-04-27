@@ -32,7 +32,9 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 		select {
 		case signal := <-wakeupCh:
 			log.Printf("[唤醒] 收到紧急信号: trigger=%s", signal.Trigger)
-			handleWakeup(database, eng, signal.Trigger, signal.News, "")
+			if err := handleWakeup(database, eng, signal.Trigger, signal.News, ""); err != nil {
+				log.Printf("[唤醒] 紧急唤醒失败: %v", err)
+			}
 
 		case <-ticker.C:
 			now := time.Now().Format(time.RFC3339)
@@ -45,8 +47,11 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 			log.Printf("[唤醒] 扫描到 %d 条待处理唤醒", len(entries))
 			for _, entry := range entries {
 				log.Printf("[唤醒] 触发唤醒: id=%d, datetime=%s, reason=%s", entry.ID, entry.Datetime, entry.Reason)
-				handleWakeup(database, eng, "scheduled_wakeup", "", entry.Reason)
-				database.MarkWakeupDone(entry.ID)
+				if err := handleWakeup(database, eng, "scheduled_wakeup", "", entry.Reason); err != nil {
+					log.Printf("[唤醒] 唤醒失败，保留 pending 状态: %v", err)
+				} else {
+					database.MarkWakeupDone(entry.ID)
+				}
 			}
 
 		case <-ctx.Done():
@@ -56,13 +61,13 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 	}
 }
 
-func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, news string, reason string) {
+func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, news string, reason string) error {
 	log.Printf("[唤醒] handleWakeup 开始: trigger=%s, reason=%s, news=%s", trigger, reason, news)
 
 	soul, err := database.GetSoul()
 	if err != nil {
 		log.Printf("[唤醒] 读取 soul 失败: %v", err)
-		return
+		return err
 	}
 	log.Printf("[唤醒] soul 加载成功: name=%s", soul.Name)
 
@@ -81,9 +86,9 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 	log.Println("[唤醒] 调用推理引擎 eng.Run()...")
 	if err := eng.Run(trigger, ctx); err != nil {
 		log.Printf("[唤醒] 推理引擎错误: %v", err)
-	} else {
-		log.Println("[唤醒] 推理引擎执行完毕")
+		return err
 	}
+	log.Println("[唤醒] 推理引擎执行完毕")
 
 	database.MarkEventsProcessed()
 
@@ -94,4 +99,5 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 		database.InsertWakeup(tomorrow.Format(time.RFC3339), "兜底唤醒")
 		log.Printf("[唤醒] 补插兜底唤醒: %s", tomorrow.Format(time.RFC3339))
 	}
+	return nil
 }

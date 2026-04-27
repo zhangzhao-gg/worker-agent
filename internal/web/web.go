@@ -127,6 +127,7 @@ type detailData struct {
 	Memories   []db.Memory
 	Events     []db.Event
 	Heartbeats []db.HeartbeatEntry
+	Wakeups    []db.WakeupEntry
 	Tab        string
 }
 
@@ -165,18 +166,21 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 	var memories []db.Memory
 	var events []db.Event
 	var heartbeats []db.HeartbeatEntry
+	var wakeups []db.WakeupEntry
 
-	wg.Add(4)
+	wg.Add(5)
 	go func() { defer wg.Done(); narratives, _ = target.DB.GetRecentNarratives(20) }()
 	go func() { defer wg.Done(); memories, _ = target.DB.GetRecentMemories(20) }()
 	go func() { defer wg.Done(); events, _ = target.DB.GetRecentEvents(20) }()
 	go func() { defer wg.Done(); heartbeats, _ = target.DB.GetRecentHeartbeats(20) }()
+	go func() { defer wg.Done(); wakeups, _ = target.DB.GetRecentWakeups(20) }()
 	wg.Wait()
 
 	data.Narratives = narratives
 	data.Memories = memories
 	data.Events = events
 	data.Heartbeats = heartbeats
+	data.Wakeups = wakeups
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	h.tmpl.ExecuteTemplate(w, "detail.html", data)

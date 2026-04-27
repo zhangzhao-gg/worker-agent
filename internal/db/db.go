@@ -287,6 +287,25 @@ func (d *Database) InsertWakeup(datetime string, reason string) error {
 	return err
 }
 
+func (d *Database) GetRecentWakeups(n int) ([]WakeupEntry, error) {
+	rows, err := d.db.Query(
+		`SELECT id, datetime, reason, status FROM wakeup_schedule ORDER BY id DESC LIMIT ?`, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []WakeupEntry
+	for rows.Next() {
+		var e WakeupEntry
+		if err := rows.Scan(&e.ID, &e.Datetime, &e.Reason, &e.Status); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
 func (d *Database) MarkWakeupDone(id int64) error {
 	_, err := d.db.Exec("UPDATE wakeup_schedule SET status = 'done' WHERE id = ?", id)
 	return err

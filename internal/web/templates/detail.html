@@ -166,6 +166,7 @@ body {
                 <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "memory"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=memory">PRIVATE MEMORY</a>
                 <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "event"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=event">CITY EVENTS</a>
                 <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "schedule"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=schedule">WORK SCHEDULE</a>
+                <a class="font-label-caps text-label-caps ink-text pb-2 {{if eq .Tab "wakeup"}}tab-active{{else}}opacity-60 hover:opacity-100{{end}}" href="?tab=wakeup">WAKEUP SCHEDULE</a>
             </div>
 
             <!-- NARRATIVE LOG -->
@@ -252,6 +253,41 @@ body {
                             <td class="font-body-md text-body-md py-3 pr-4">{{.Date}}</td>
                             <td class="font-body-md text-body-md py-3 pr-4">{{.Time}}</td>
                             <td class="font-body-md text-body-md py-3 pr-4">{{.Task}}</td>
+                            <td class="py-3">
+                                <span class="font-label-caps text-label-caps px-2 py-0.5 border
+                                    {{if eq .Status "done"}}ink-border text-on-surface-variant
+                                    {{else if eq .Status "pending"}}border-amber-500 text-amber-700
+                                    {{else}}border-red-400 text-red-700{{end}}">
+                                    {{.Status}}
+                                </span>
+                            </td>
+                        </tr>
+                        {{end}}
+                    </tbody>
+                </table>
+                {{end}}
+            </div>
+            {{end}}
+
+            <!-- WAKEUP SCHEDULE -->
+            {{if eq .Tab "wakeup"}}
+            <div class="space-y-1">
+                {{if not .Wakeups}}
+                <p class="font-body-lg text-body-lg text-on-surface-variant italic">No wakeup entries yet.</p>
+                {{else}}
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b ink-border">
+                            <th class="font-label-caps text-label-caps text-left py-3 pr-4">DATETIME</th>
+                            <th class="font-label-caps text-label-caps text-left py-3 pr-4">REASON</th>
+                            <th class="font-label-caps text-label-caps text-left py-3">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {{range .Wakeups}}
+                        <tr class="border-b border-outline-variant/50">
+                            <td class="font-body-md text-body-md py-3 pr-4">{{fmtTime .Datetime}}</td>
+                            <td class="font-body-md text-body-md py-3 pr-4">{{.Reason}}</td>
                             <td class="py-3">
                                 <span class="font-label-caps text-label-caps px-2 py-0.5 border
                                     {{if eq .Status "done"}}ink-border text-on-surface-variant
