@@ -69,7 +69,8 @@ func (c *CityAPI) PostNarrative(workerID string, text string) error {
 
 func (c *CityAPI) GetCityTemperature() (string, error) {
 	if c.mock {
-		return pickRandom(mockTemperatures), nil
+		day := time.Now().YearDay()
+		return mockTemperatures[day%len(mockTemperatures)], nil
 	}
 	// TODO: 实现 HTTP 调用
 	return "", nil
@@ -77,7 +78,8 @@ func (c *CityAPI) GetCityTemperature() (string, error) {
 
 func (c *CityAPI) GetFoodStatus() (string, error) {
 	if c.mock {
-		return pickRandom(mockFoodStatus), nil
+		day := time.Now().YearDay()
+		return mockFoodStatus[day%len(mockFoodStatus)], nil
 	}
 	// TODO: 实现 HTTP 调用
 	return "", nil
@@ -98,7 +100,9 @@ func (c *CityAPI) GetCityAnnouncements() ([]string, error) {
 
 func (c *CityAPI) GetMyWorkAssignment(workerID string) (string, error) {
 	if c.mock {
-		return pickRandom(mockAssignments), nil
+		// 按天固定，同一天内工作分配不变
+		day := time.Now().YearDay()
+		return mockAssignments[day%len(mockAssignments)], nil
 	}
 	// TODO: 实现 HTTP 调用
 	return "", nil
@@ -153,7 +157,10 @@ var mockNews = []string{
 }
 
 func (c *CityAPI) mockHeartbeat() HeartbeatResponse {
-	return HeartbeatResponse{News: pickRandom(mockNews)}
+	if rand.Intn(100) == 0 {
+		return HeartbeatResponse{News: pickRandom(mockNews[5:])}
+	}
+	return HeartbeatResponse{}
 }
 
 func pickRandom(options []string) string {

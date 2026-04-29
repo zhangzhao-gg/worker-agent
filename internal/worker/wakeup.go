@@ -73,12 +73,18 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 
 	summary, _ := database.GetLatestSummary()
 	events, _ := database.GetUnprocessedEvents()
-	log.Printf("[唤醒] 上下文: summary长度=%d, 未处理事件=%d", len(summary), len(events))
+
+	now := time.Now()
+	rangeFrom := now.AddDate(0, 0, -3).Format(time.RFC3339)
+	rangeTo := now.AddDate(0, 0, 3).Format(time.RFC3339)
+	wakeups, _ := database.GetWakeupRange(rangeFrom, rangeTo)
+	log.Printf("[唤醒] 上下文: summary长度=%d, 未处理事件=%d, 唤醒记录=%d", len(summary), len(events), len(wakeups))
 
 	ctx := engine.RunContext{
 		Soul:    soul,
 		Summary: summary,
 		Events:  events,
+		Wakeups: wakeups,
 		Reason:  reason,
 		News:    news,
 	}

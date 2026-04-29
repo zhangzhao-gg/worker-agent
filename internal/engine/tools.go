@@ -30,7 +30,8 @@ var toolsJSON = `[
   {"name":"get_memories","description":"回忆自己之前的想法和记忆。","input_schema":{"type":"object","properties":{"n":{"type":"integer","description":"返回条数"}},"required":["n"]}},
   {"name":"write_heartbeat_schedule","description":"批量写入今天的心跳计划。每条含时间和任务描述。","input_schema":{"type":"object","properties":{"entries":{"type":"array","items":{"type":"object","properties":{"time":{"type":"string","description":"HH:MM 格式"},"task":{"type":"string","description":"心跳任务描述"}},"required":["time","task"]}}},"required":["entries"]}},
   {"name":"update_heartbeat_schedule","description":"增删改心跳计划中的条目。","input_schema":{"type":"object","properties":{"changes":{"type":"array","items":{"type":"object","properties":{"id":{"type":"integer","description":"计划条目 ID"},"action":{"type":"string","enum":["add","modify","delete"]},"time":{"type":"string"},"task":{"type":"string"}},"required":["action"]}}},"required":["changes"]}},
-  {"name":"schedule_wakeup","description":"安排未来某个时间点唤醒你的大脑进行思考。可多次调用安排多个时间点。","input_schema":{"type":"object","properties":{"datetime":{"type":"string","description":"ISO 格式时间"},"reason":{"type":"string","description":"唤醒原因"}},"required":["datetime","reason"]}},
+  {"name":"schedule_wakeup","description":"安排未来某个时间点唤醒你的大脑进行思考。同一小时内不会重复安排。","input_schema":{"type":"object","properties":{"datetime":{"type":"string","description":"ISO 格式时间"},"reason":{"type":"string","description":"唤醒原因"}},"required":["datetime","reason"]}},
+  {"name":"cancel_wakeup","description":"取消一个不再需要的唤醒计划（只能取消 pending 状态的）。","input_schema":{"type":"object","properties":{"id":{"type":"integer","description":"唤醒计划的 ID"}},"required":["id"]}},
   {"name":"write_narrative","description":"写下你的对外叙事，会被同步到城市日志，其他人可以看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
   {"name":"write_memory","description":"写下私人记忆，只有你自己能看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
   {"name":"update_soul","description":"批量更新你的情绪状态。只能修改 mood、hope、grievance。值无范围限制，由你自主决定。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance"]},"value":{"type":"integer","description":"情绪值，无范围限制"}},"required":["field","value"]}}},"required":["updates"]}},
@@ -62,6 +63,7 @@ func (e *Engine) buildHandlers(todo *TodoManager) ToolHandlerMap {
 		"write_heartbeat_schedule":  func(input map[string]any) (string, error) { return e.handleWriteHeartbeats(input) },
 		"update_heartbeat_schedule": func(input map[string]any) (string, error) { return e.handleUpdateHeartbeats(input) },
 		"schedule_wakeup":           func(input map[string]any) (string, error) { return e.handleScheduleWakeup(input) },
+		"cancel_wakeup":             func(input map[string]any) (string, error) { return e.handleCancelWakeup(input) },
 		"write_narrative":           func(input map[string]any) (string, error) { return e.handleWriteNarrative(input) },
 		"write_memory":              func(input map[string]any) (string, error) { return e.handleWriteMemory(input) },
 		"update_soul":               func(input map[string]any) (string, error) { return e.handleUpdateSoul(input) },
@@ -116,6 +118,14 @@ func (e *Engine) handleScheduleWakeup(input map[string]any) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("已安排唤醒: %s (%s)", dt, reason), nil
+}
+
+func (e *Engine) handleCancelWakeup(input map[string]any) (string, error) {
+	id := int64(intFromInput(input, "id"))
+	if err := e.db.CancelWakeup(id); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("已取消唤醒: id=%d", id), nil
 }
 
 func (e *Engine) handleWriteNarrative(input map[string]any) (string, error) {

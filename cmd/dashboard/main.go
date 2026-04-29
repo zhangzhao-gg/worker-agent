@@ -26,13 +26,15 @@ func main() {
 	dataDir := flag.String("data", "./data", "数据目录（与 worker 共享）")
 	flag.Parse()
 
-	dash := &dashboard{dataDir: *dataDir}
+	dash := &dashboard{
+		dataDir: *dataDir,
+		conns:   make(map[string]*db.Database),
+	}
 
 	mux := http.NewServeMux()
 	webHandler := web.New(dash.entries)
 	webHandler.Register(mux)
 
-	// 静态文件（头像）
 	avatarDir := filepath.Join(*dataDir, "avatars")
 	os.MkdirAll(avatarDir, 0755)
 	mux.Handle("GET /static/avatars/", http.StripPrefix("/static/avatars/", http.FileServer(http.Dir(avatarDir))))
@@ -43,11 +45,13 @@ func main() {
 }
 
 // ================================================================
-//  每次请求实时扫描 DB 文件，无缓存，始终反映最新状态
+//  长连接池，每次请求刷新文件列表
 // ================================================================
 
 type dashboard struct {
 	dataDir string
+	mu      sync.Mutex
+	conns   map[string]*db.Database
 }
 
 func (d *dashboard) entries() []web.WorkerEntry {
@@ -57,45 +61,55 @@ func (d *dashboard) entries() []web.WorkerEntry {
 		return nil
 	}
 
-	var (
-		mu      sync.Mutex
-		entries []web.WorkerEntry
-		wg      sync.WaitGroup
-	)
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
+	// 收集当前有效的 db 文件
+	activeFiles := make(map[string]bool)
 	for _, f := range dir {
 		if f.IsDir() || !strings.HasSuffix(f.Name(), ".db") {
 			continue
 		}
-
 		name := strings.TrimSuffix(f.Name(), ".db")
-		dbPath := filepath.Join(d.dataDir, f.Name())
+		activeFiles[name] = true
 
-		wg.Add(1)
-		go func(name, dbPath string) {
-			defer wg.Done()
-
+		if _, exists := d.conns[name]; !exists {
+			dbPath := filepath.Join(d.dataDir, f.Name())
 			database, err := db.NewReadOnly(dbPath)
 			if err != nil {
 				log.Printf("[dashboard] 打开 %s 失败: %v", name, err)
-				return
+				continue
 			}
-			defer database.Close()
-
-			if _, err := database.GetSoul(); err != nil {
-				return
-			}
-
-			mu.Lock()
-			entries = append(entries, web.WorkerEntry{
-				Name:   name,
-				Status: "unknown",
-				DB:     database,
-			})
-			mu.Unlock()
-		}(name, dbPath)
+			d.conns[name] = database
+		}
 	}
 
-	wg.Wait()
+	// 清理已删除的 db
+	for name, conn := range d.conns {
+		if !activeFiles[name] {
+			conn.Close()
+			delete(d.conns, name)
+		}
+	}
+
+	// 组装结果
+	var entries []web.WorkerEntry
+	for name, database := range d.conns {
+		if _, err := database.GetSoul(); err != nil {
+			continue
+		}
+
+		status := "stopped"
+		if hasPending, _ := database.HasPendingWakeups(); hasPending {
+			status = "running"
+		}
+
+		entries = append(entries, web.WorkerEntry{
+			Name:   name,
+			Status: status,
+			DB:     database,
+		})
+	}
+
 	return entries
 }
