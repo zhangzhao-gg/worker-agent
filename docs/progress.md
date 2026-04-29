@@ -9,25 +9,34 @@
 ## 已完成
 
 ### 核心架构
+- **双进程分离**：Worker 进程（:8080 纯 API + 协程）+ Dashboard 进程（:8081 只读 UI）
 - **双协程模型**：心跳协程（身体）+ 唤醒调度协程（大脑入口）
-- **SQLite WAL 模式**：6 张表（soul / heartbeat_schedule / wakeup_schedule / events / memories / narratives）
+- **SQLite WAL 模式**：6 张表，支持多进程并发读写
 - **LLM Agent Loop**：最多 30 轮推理，含 microcompact + autoCompact 压缩管线
-- **14 个工具**：6 感知 + 6 行动 + 2 元工具（TodoWrite / compress）
+- **15 个工具**：6 感知 + 7 行动（含 cancel_wakeup）+ 2 元工具
 - **TodoManager**：防止 LLM 推理偏移，3 轮未更新自动提醒
+
+### 唤醒/心跳制度
+- **工作制度**：朝八晚六（08:00-18:00），每 10 分钟心跳汇报
+- **唤醒规则**：一天最多 2-3 次（起床规划/晚间复盘/突发事件），LLM 在 prompt 中被明确约束
+- **心跳规则**：工作时间内的任务安排，身体自动执行，不需要 LLM 推理
+- **cancel_wakeup**：LLM 可自主清理冗余唤醒
+- **唤醒上下文**：推理时注入过去3天+未来3天的唤醒记录 + 今日工作分配
+- **重启审视**：每次重启无条件触发一次 LLM 推理，审视计划合理性
 
 ### 接入层
 - **MiniMax M2.7**：OpenAI 兼容 API，base URL `https://api.minimaxi.com`
-- **城市 API Mock 模式**：Frostpunk 风格测试数据（温度/食物/公告/工作/新闻）
+- **城市 API Mock 模式**：Frostpunk 风格测试数据，按天固定（同日内一致）
+- **Mock News**：1% 概率触发，避免心跳频繁产生事件
 - **自动读取 .env**：内置轻量 loadEnv，无需第三方依赖
 
 ### HTTP 服务
 - `POST /api/workers` — 创建工人（含 soul 人设 + avatar）
 - `GET /api/workers` — 列出所有工人
 - `GET /api/workers/{name}` — 查询单个工人详情
-- **重启自动恢复**：扫描 data/*.db，恢复所有工人协程
-- **Resume 补插唤醒**：无 pending wakeup 时自动插入，防止大脑永睡
+- **重启自动恢复**：扫描 data/*.db，恢复所有工人协程 + 强制审视唤醒
 
-### Web UI
+### Web UI（独立 Dashboard 进程）
 - **首页**：工人卡片列表，显示名字/职业/状态/三维情绪条
 - **详情页**：左栏身份+情绪+背景，右栏五个标签：
   - NARRATIVE LOG — 对外叙事时间线
@@ -35,7 +44,8 @@
   - CITY EVENTS — 收到的城市事件
   - WORK SCHEDULE — 心跳工作计划表
   - WAKEUP SCHEDULE — 唤醒计划表
-- **头像支持**：创建时传 avatar 路径，静态文件服务 `/static/avatars/`
+- **长连接池**：只读打开 DB，状态从 pending wakeup 推断
+- **头像支持**：静态文件服务 `/static/avatars/`
 - 风格：维多利亚蒸汽朋克，Newsreader 字体，复古墨水色调
 
 ### 健壮性
@@ -55,11 +65,12 @@
 | LLM 感知城市状态（温度/食物/公告/工作） | ✔ |
 | LLM 制定心跳计划（write_heartbeat_schedule） | ✔ |
 | LLM 安排唤醒（schedule_wakeup） | ✔ |
+| LLM 取消唤醒（cancel_wakeup） | ✔ |
 | LLM 写叙事和记忆 | ✔ |
 | LLM 更新情绪（update_soul） | ✔ |
 | 心跳协程自动执行计划并收取 news | ✔ |
-| 重启后自动恢复工人 | ✔ |
-| Web UI 展示所有数据 | ✔ |
+| 重启后自动恢复 + 触发审视唤醒 | ✔ |
+| Dashboard 独立进程展示所有数据 | ✔ |
 | LLM 调用失败后 wakeup 重试 | ✔ |
 
 ---
@@ -71,7 +82,7 @@
 - [ ] 修改人设 API（`PUT /api/workers/{name}`）
 - [ ] 城市 API 真实 HTTP 对接（目前仅 mock）
 - [ ] `update_heartbeat_schedule` 工具实现（目前是 TODO stub）
-- [ ] 心跳协程收到 news 后的紧急判断需要 LLM 调用，nil client 时应跳过
+- [ ] 心跳协程紧急判断：nil client 时跳过 LLM 调用
 
 ### 优化
 - [ ] LLM 回复中 `<think>` 标签过滤（MiniMax M2.7 思维链输出）
@@ -89,18 +100,21 @@
 ## 运行方式
 
 ```bash
-# 启动（自动读取 .env 中的 LLM_API_KEY）
+# 终端 1: Worker 引擎（API :8080）
 go run ./cmd/worker/
+
+# 终端 2: Dashboard UI（:8081）
+go run ./cmd/dashboard/
 
 # 创建工人
 curl -X POST http://localhost:8080/api/workers \
   -H "Content-Type: application/json" \
-  -d '{"name":"乔布斯","occupation":"矿工","background":"..."}'
+  -d '{"name":"乔布斯","occupation":"矿工","background":"...","personality":"...","speech_style":"...","values_desc":"...","family":"..."}'
 
 # 打开 UI
-open http://localhost:8080
+open http://localhost:8081
 ```
 
 ---
 
-*最后更新：2026-04-27*
+*最后更新：2026-04-29*

@@ -10,12 +10,15 @@ package engine
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"time"
 
 	"worker-agent/internal/db"
 	"worker-agent/internal/llm"
 )
+
+var thinkTagRe = regexp.MustCompile(`<think>[\s\S]*?</think>\s*`)
 
 // ================================================================
 //  Tool Schema（JSON 原文）
@@ -130,6 +133,7 @@ func (e *Engine) handleCancelWakeup(input map[string]any) (string, error) {
 
 func (e *Engine) handleWriteNarrative(input map[string]any) (string, error) {
 	text, _ := input["text"].(string)
+	text = stripThink(text)
 	if err := e.db.InsertNarrative(text); err != nil {
 		return "", err
 	}
@@ -139,7 +143,12 @@ func (e *Engine) handleWriteNarrative(input map[string]any) (string, error) {
 
 func (e *Engine) handleWriteMemory(input map[string]any) (string, error) {
 	text, _ := input["text"].(string)
+	text = stripThink(text)
 	return "记忆已记录", e.db.InsertMemory(text, "memory")
+}
+
+func stripThink(s string) string {
+	return thinkTagRe.ReplaceAllString(s, "")
 }
 
 func (e *Engine) handleUpdateSoul(input map[string]any) (string, error) {
