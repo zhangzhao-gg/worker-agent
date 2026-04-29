@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm, internal/web
+ * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm
  * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理
- * [POS]: internal/server 的唯一成员，管理工人创建/恢复/查询
+ * [POS]: internal/server 的唯一成员，纯 API + 协程管理，Web UI 已分离至 cmd/dashboard
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -23,7 +23,6 @@ import (
 	"worker-agent/internal/db"
 	"worker-agent/internal/engine"
 	"worker-agent/internal/llm"
-	"worker-agent/internal/web"
 	"worker-agent/internal/worker"
 )
 
@@ -136,33 +135,9 @@ func (s *Server) ListenAndServe(port int) error {
 	mux.HandleFunc("GET /api/workers", s.handleList)
 	mux.HandleFunc("GET /api/workers/{name}", s.handleGet)
 
-	// ── Web UI ──
-	webHandler := web.New(s.workerEntries)
-	webHandler.Register(mux)
-
-	// ── 静态文件（头像等） ──
-	avatarDir := filepath.Join(s.dataDir, "avatars")
-	os.MkdirAll(avatarDir, 0755)
-	mux.Handle("GET /static/avatars/", http.StripPrefix("/static/avatars/", http.FileServer(http.Dir(avatarDir))))
-
 	addr := fmt.Sprintf(":%d", port)
 	log.Printf("[server] 启动 HTTP 服务: %s", addr)
 	return http.ListenAndServe(addr, mux)
-}
-
-func (s *Server) workerEntries() []web.WorkerEntry {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	entries := make([]web.WorkerEntry, 0, len(s.workers))
-	for _, rw := range s.workers {
-		entries = append(entries, web.WorkerEntry{
-			Name:   rw.Name,
-			Status: rw.Status,
-			DB:     rw.database,
-		})
-	}
-	return entries
 }
 
 // POST /api/workers — 创建工人

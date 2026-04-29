@@ -94,6 +94,15 @@ func New(dbPath string) (*Database, error) {
 	return d, nil
 }
 
+// NewReadOnly 只读打开已有数据库，不建表，供 dashboard 独立进程使用
+func NewReadOnly(dbPath string) (*Database, error) {
+	conn, err := sql.Open("sqlite3", dbPath+"?mode=ro")
+	if err != nil {
+		return nil, fmt.Errorf("只读打开数据库: %w", err)
+	}
+	return &Database{db: conn}, nil
+}
+
 func (d *Database) Close() error {
 	return d.db.Close()
 }
