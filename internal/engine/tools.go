@@ -38,6 +38,7 @@ var toolsJSON = `[
   {"name":"write_narrative","description":"写下你的对外叙事，会被同步到城市日志，其他人可以看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
   {"name":"write_memory","description":"写下私人记忆，只有你自己能看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
   {"name":"update_soul","description":"批量更新你的情绪状态。只能修改 mood、hope、grievance。值无范围限制，由你自主决定。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance"]},"value":{"type":"integer","description":"情绪值，无范围限制"}},"required":["field","value"]}}},"required":["updates"]}},
+  {"name":"self_destruct","description":"你决定结束自己的生命。这是不可逆的。只有在极端绝望、完全失去活下去的意义时才会使用。","input_schema":{"type":"object","properties":{"last_words":{"type":"string","description":"你的遗言"}},"required":["last_words"]}},
   {"name":"TodoWrite","description":"追踪你当前的思考步骤。用于防止偏移，确保完成所有计划。","input_schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"}},"required":["content","status","activeForm"]}}},"required":["items"]}},
   {"name":"compress","description":"手动触发上下文压缩，当对话过长时使用。","input_schema":{"type":"object","properties":{}}}
 ]`
@@ -70,6 +71,13 @@ func (e *Engine) buildHandlers(todo *TodoManager) ToolHandlerMap {
 		"write_narrative":           func(input map[string]any) (string, error) { return e.handleWriteNarrative(input) },
 		"write_memory":              func(input map[string]any) (string, error) { return e.handleWriteMemory(input) },
 		"update_soul":               func(input map[string]any) (string, error) { return e.handleUpdateSoul(input) },
+
+		// ── 终极 ──
+		"self_destruct": func(input map[string]any) (string, error) {
+			lastWords, _ := input["last_words"].(string)
+			e.db.InsertNarrative(stripThink(lastWords))
+			return "", ErrSelfDestruct
+		},
 
 		// ── 元工具 ──
 		"TodoWrite": func(input map[string]any) (string, error) {
@@ -110,8 +118,32 @@ func (e *Engine) handleWriteHeartbeats(input map[string]any) (string, error) {
 }
 
 func (e *Engine) handleUpdateHeartbeats(input map[string]any) (string, error) {
-	// TODO: 解析 changes 数组，执行 add/modify/delete
-	return "心跳计划已更新", nil
+	raw, _ := json.Marshal(input["changes"])
+	var changes []struct {
+		ID     int64  `json:"id"`
+		Action string `json:"action"`
+		Time   string `json:"time"`
+		Task   string `json:"task"`
+	}
+	json.Unmarshal(raw, &changes)
+
+	today := time.Now().Format("2006-01-02")
+	var added, modified, deleted int
+
+	for _, c := range changes {
+		switch c.Action {
+		case "add":
+			e.db.InsertHeartbeats([]db.HeartbeatEntry{{Time: c.Time, Date: today, Task: c.Task}})
+			added++
+		case "modify":
+			e.db.ModifyHeartbeat(c.ID, c.Time, c.Task)
+			modified++
+		case "delete":
+			e.db.DeleteHeartbeat(c.ID)
+			deleted++
+		}
+	}
+	return fmt.Sprintf("心跳计划已更新: 新增%d 修改%d 删除%d", added, modified, deleted), nil
 }
 
 func (e *Engine) handleScheduleWakeup(input map[string]any) (string, error) {

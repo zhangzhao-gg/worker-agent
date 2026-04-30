@@ -107,15 +107,15 @@ func (h *HeartbeatRunner) sendHeartbeat(entry ScheduleEntry) {
 
 ### 3.3 紧急判断
 
-工人**自己判断**这条 news 对自己是否紧急。调用轻量 LLM（haiku 级），传入 news + soul 摘要，返回 bool。
+工人**自己判断**这条 news 对自己是否紧急。复用同一个 LLM 实例（简短 prompt，单轮调用），传入 news + soul 摘要，返回 bool。
 
 不同工人对同一条 news 的紧急程度判断不同：矿工听到「矿井塌方」是紧急的，厨师可能无所谓。
 
 ```go
-// CheckUrgency 调用轻量 LLM 判断 news 对该工人是否紧急
-func (h *HeartbeatRunner) checkUrgency(news string, soul Soul) bool {
+// CheckUrgency 调用 LLM 判断 news 对该工人是否紧急
+func checkUrgency(llmClient llm.Client, news string, soul Soul) bool {
     prompt := fmt.Sprintf("你是%s（%s）。以下消息对你来说需要立刻停下手头工作去思考吗？只回答 yes 或 no。\n消息：%s", soul.Name, soul.Occupation, news)
-    resp := llmCall(prompt)  // haiku 级轻量调用
+    resp := llmClient.Chat("你是一个判断助手，只回答 yes 或 no。", ...)
     return strings.TrimSpace(resp) == "yes"
 }
 ```

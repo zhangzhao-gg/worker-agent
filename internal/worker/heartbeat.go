@@ -84,10 +84,13 @@ func processHeartbeats(database *db.Database, cityAPI *city.CityAPI, llmClient l
 }
 
 // ================================================================
-//  紧急判断（本地轻量 LLM 调用）
+//  紧急判断（复用同一 LLM，单轮简短 prompt）
 // ================================================================
 
 func checkUrgency(llmClient llm.Client, news string, soul db.Soul) bool {
+	if llmClient == nil {
+		return false
+	}
 	prompt := fmt.Sprintf(
 		"你是%s（%s）。以下消息对你来说需要立刻停下手头工作去思考吗？只回答 yes 或 no。\n消息：%s",
 		soul.Name, soul.Occupation, news,

@@ -9,9 +9,11 @@ package engine
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
+	"unicode/utf8"
 
 	"worker-agent/internal/llm"
 )
@@ -34,10 +36,23 @@ type ToolHandler func(input map[string]any) (string, error)
 type ToolHandlerMap map[string]ToolHandler
 
 // ================================================================
+//  Agent Loop 配置
+// ================================================================
+
+type loopConfig struct {
+	Client   llm.Client
+	Prompt   string
+	Tools    []llm.ToolDef
+	Handlers ToolHandlerMap
+	Todo     *TodoManager
+	LogFn    LogFunc
+}
+
+// ================================================================
 //  Agent Loop
 // ================================================================
 
-func agentLoop(client llm.Client, systemPrompt string, initialMessage string, tools []llm.ToolDef, handlers ToolHandlerMap, todo *TodoManager) error {
+func agentLoop(cfg loopConfig, initialMessage string) error {
 	messages := []llm.Message{
 		{Role: "user", Content: initialMessage},
 	}
@@ -47,6 +62,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 	log.Printf("║ 初始消息: %s", truncate(initialMessage, 120))
 	log.Println("╚══════════════════════════════════════════════════════════")
 
+	cfg.LogFn(0, "input", initialMessage)
 	roundsWithoutTodo := 0
 
 	for round := 0; round < MaxAgentRounds; round++ {
@@ -55,7 +71,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 		tokens := estimateTokens(messages)
 		if tokens > TokenThreshold {
 			log.Printf("  ⚙ 触发自动压缩 (tokens≈%d)", tokens)
-			messages = autoCompact(client, messages)
+			messages = autoCompact(cfg.Client, messages)
 		}
 
 		// ── LLM 调用 ──
@@ -63,7 +79,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 		log.Printf("│ Round %d  |  messages=%d  |  tokens≈%d", round+1, len(messages), tokens)
 		log.Println("│ 调用 LLM...")
 
-		resp, err := client.Chat(systemPrompt, messages, tools)
+		resp, err := cfg.Client.Chat(cfg.Prompt, messages, cfg.Tools)
 		if err != nil {
 			log.Printf("│ ✘ LLM 调用失败: %v", err)
 			log.Println("└──────────────────────────────────────────────────────────")
@@ -75,6 +91,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 		// ── LLM 文本输出 ──
 		if resp.Message.Content != "" {
 			log.Printf("│ 💬 LLM: %s", truncate(resp.Message.Content, 200))
+			cfg.LogFn(round+1, "llm_text", resp.Message.Content)
 		}
 
 		// ── 推理结束? ──
@@ -84,6 +101,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 			log.Println("╔══════════════════════════════════════════════════════════")
 			log.Printf("║ AGENT LOOP 完成  |  共 %d 轮", round+1)
 			log.Println("╚══════════════════════════════════════════════════════════")
+			cfg.LogFn(round+1, "finish", resp.StopReason)
 			return nil
 		}
 
@@ -104,15 +122,22 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 			}
 
 			log.Printf("│   [%d] %s(%s)", i+1, name, truncate(args, 100))
+			cfg.LogFn(round+1, "tool_call", name+"("+args+")")
 
 			var output string
-			handler, ok := handlers[name]
+			handler, ok := cfg.Handlers[name]
 			if !ok {
 				output = "Unknown tool: " + name
 			} else {
 				var input map[string]any
 				json.Unmarshal([]byte(args), &input)
 				result, err := handler(input)
+				if errors.Is(err, ErrSelfDestruct) {
+					log.Println("│       ☠ 工人选择自我终结")
+					log.Println("└──────────────────────────────────────────────────────────")
+					cfg.LogFn(round+1, "self_destruct", name)
+					return ErrSelfDestruct
+				}
 				if err != nil {
 					output = "Error: " + err.Error()
 					log.Printf("│       ✘ %s", truncate(output, 150))
@@ -125,6 +150,8 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 			if len(output) > MaxToolOutput {
 				output = output[:MaxToolOutput] + "... [truncated]"
 			}
+
+			cfg.LogFn(round+1, "tool_result", name+": "+truncate(output, 500))
 
 			messages = append(messages, llm.Message{
 				Role:       "tool",
@@ -140,7 +167,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 		} else {
 			roundsWithoutTodo++
 		}
-		if todo.HasOpenItems() && roundsWithoutTodo >= 3 {
+		if cfg.Todo.HasOpenItems() && roundsWithoutTodo >= 3 {
 			log.Println("  ⚠ Todo 偏移提醒（3 轮未更新）")
 			messages = append(messages, llm.Message{
 				Role:    "user",
@@ -151,7 +178,7 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 		// ── 手动压缩 ──
 		if manualCompress {
 			log.Println("  ⚙ 手动压缩触发")
-			messages = autoCompact(client, messages)
+			messages = autoCompact(cfg.Client, messages)
 		}
 	}
 
@@ -163,8 +190,9 @@ func agentLoop(client llm.Client, systemPrompt string, initialMessage string, to
 
 func truncate(s string, n int) string {
 	s = strings.ReplaceAll(s, "\n", " ")
-	if len(s) <= n {
+	if utf8.RuneCountInString(s) <= n {
 		return s
 	}
-	return s[:n] + "..."
+	runes := []rune(s)
+	return string(runes[:n]) + "..."
 }

@@ -24,6 +24,7 @@ import (
 func main() {
 	port := flag.Int("port", 8081, "Dashboard HTTP 端口")
 	dataDir := flag.String("data", "./data", "数据目录（与 worker 共享）")
+	workerAPI := flag.String("worker-api", "http://localhost:8080", "Worker API 地址")
 	flag.Parse()
 
 	dash := &dashboard{
@@ -33,6 +34,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	webHandler := web.New(dash.entries)
+	webHandler.WorkerAPI = *workerAPI
 	webHandler.Register(mux)
 
 	avatarDir := filepath.Join(*dataDir, "avatars")

@@ -31,8 +31,9 @@ type WorkerEntry struct {
 }
 
 type Handler struct {
-	workers func() []WorkerEntry
-	tmpl    *template.Template
+	workers   func() []WorkerEntry
+	tmpl      *template.Template
+	WorkerAPI string
 }
 
 func New(workers func() []WorkerEntry) *Handler {
@@ -120,15 +121,17 @@ func (h *Handler) handleIndex(w http.ResponseWriter, r *http.Request) {
 // ================================================================
 
 type detailData struct {
-	Name       string
-	Status     string
-	Soul       db.Soul
-	Narratives []db.Narrative
-	Memories   []db.Memory
-	Events     []db.Event
-	Heartbeats []db.HeartbeatEntry
-	Wakeups    []db.WakeupEntry
-	Tab        string
+	Name          string
+	Status        string
+	Soul          db.Soul
+	Narratives    []db.Narrative
+	Memories      []db.Memory
+	Events        []db.Event
+	Heartbeats    []db.HeartbeatEntry
+	Wakeups       []db.WakeupEntry
+	ReasoningLogs []db.ReasoningLog
+	Tab           string
+	WorkerAPI     string
 }
 
 func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
@@ -155,10 +158,11 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 	soul, _ := target.DB.GetSoul()
 
 	data := detailData{
-		Name:   target.Name,
-		Status: target.Status,
-		Soul:   soul,
-		Tab:    tab,
+		Name:      target.Name,
+		Status:    target.Status,
+		Soul:      soul,
+		Tab:       tab,
+		WorkerAPI: h.WorkerAPI,
 	}
 
 	var wg sync.WaitGroup
@@ -167,13 +171,15 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 	var events []db.Event
 	var heartbeats []db.HeartbeatEntry
 	var wakeups []db.WakeupEntry
+	var reasoningLogs []db.ReasoningLog
 
-	wg.Add(5)
+	wg.Add(6)
 	go func() { defer wg.Done(); narratives, _ = target.DB.GetRecentNarratives(20) }()
 	go func() { defer wg.Done(); memories, _ = target.DB.GetRecentMemories(20) }()
 	go func() { defer wg.Done(); events, _ = target.DB.GetRecentEvents(20) }()
 	go func() { defer wg.Done(); heartbeats, _ = target.DB.GetRecentHeartbeats(20) }()
 	go func() { defer wg.Done(); wakeups, _ = target.DB.GetRecentWakeups(20) }()
+	go func() { defer wg.Done(); reasoningLogs, _ = target.DB.GetRecentReasoningLogs(100) }()
 	wg.Wait()
 
 	data.Narratives = narratives
@@ -181,6 +187,7 @@ func (h *Handler) handleDetail(w http.ResponseWriter, r *http.Request) {
 	data.Events = events
 	data.Heartbeats = heartbeats
 	data.Wakeups = wakeups
+	data.ReasoningLogs = reasoningLogs
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	h.tmpl.ExecuteTemplate(w, "detail.html", data)

@@ -131,10 +131,13 @@ func (s *Server) ListenAndServe(port int) error {
 	mux.HandleFunc("POST /api/workers", s.handleCreate)
 	mux.HandleFunc("GET /api/workers", s.handleList)
 	mux.HandleFunc("GET /api/workers/{name}", s.handleGet)
+	mux.HandleFunc("PUT /api/workers/{name}", s.handleUpdate)
+	mux.HandleFunc("POST /api/workers/{name}/wakeup", s.handleManualWakeup)
+	mux.HandleFunc("DELETE /api/workers/{name}", s.handleDelete)
 
 	addr := fmt.Sprintf(":%d", port)
 	log.Printf("[server] 启动 HTTP 服务: %s", addr)
-	return http.ListenAndServe(addr, mux)
+	return http.ListenAndServe(addr, corsMiddleware(mux))
 }
 
 // POST /api/workers — 创建工人
@@ -239,6 +242,89 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// PUT /api/workers/{name} — 修改人设
+func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	slug := sanitizeName(name)
+
+	s.mu.RLock()
+	rw, exists := s.workers[slug]
+	s.mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "工人不存在: "+name, http.StatusNotFound)
+		return
+	}
+
+	var updates map[string]string
+	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+		http.Error(w, "无效 JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := rw.database.UpdateSoulFields(updates); err != nil {
+		http.Error(w, "更新失败: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "updated"})
+	log.Printf("[server] 更新人设: %s, fields=%v", name, updates)
+}
+
+// POST /api/workers/{name}/wakeup — 手动唤醒
+func (s *Server) handleManualWakeup(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	slug := sanitizeName(name)
+
+	s.mu.RLock()
+	rw, exists := s.workers[slug]
+	s.mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "工人不存在: "+name, http.StatusNotFound)
+		return
+	}
+
+	var body struct {
+		Reason string `json:"reason"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	if body.Reason == "" {
+		body.Reason = "手动唤醒"
+	}
+
+	wakeupTime := time.Now().Add(3 * time.Second).Format(time.RFC3339)
+	rw.database.InsertWakeup(wakeupTime, body.Reason)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "wakeup_scheduled", "reason": body.Reason})
+	log.Printf("[server] 手动唤醒: %s, reason=%s", name, body.Reason)
+}
+
+// DELETE /api/workers/{name} — 停止并删除工人
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	slug := sanitizeName(name)
+
+	s.mu.Lock()
+	rw, exists := s.workers[slug]
+	if !exists {
+		s.mu.Unlock()
+		http.Error(w, "工人不存在: "+name, http.StatusNotFound)
+		return
+	}
+	delete(s.workers, slug)
+	s.mu.Unlock()
+
+	rw.cancel()
+	rw.database.Close()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "deleted"})
+	log.Printf("[server] 删除工人: %s", name)
+}
+
 // ================================================================
 //  工人生命周期
 // ================================================================
@@ -279,6 +365,19 @@ func (s *Server) startWorker(name string, dbPath string, database *db.Database) 
 // ================================================================
 //  辅助
 // ================================================================
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 func sanitizeName(name string) string {
 	replacer := strings.NewReplacer(" ", "_", "/", "_", "\\", "_", ".", "_")

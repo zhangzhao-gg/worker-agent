@@ -87,12 +87,8 @@ func (c *CityAPI) GetFoodStatus() (string, error) {
 
 func (c *CityAPI) GetCityAnnouncements() ([]string, error) {
 	if c.mock {
-		n := rand.Intn(3) + 1
-		result := make([]string, n)
-		for i := range result {
-			result[i] = pickRandom(mockAnnouncements)
-		}
-		return result, nil
+		day := time.Now().YearDay()
+		return []string{mockAnnouncements[day%len(mockAnnouncements)]}, nil
 	}
 	// TODO: 实现 HTTP 调用
 	return nil, nil
@@ -100,9 +96,7 @@ func (c *CityAPI) GetCityAnnouncements() ([]string, error) {
 
 func (c *CityAPI) GetMyWorkAssignment(workerID string) (string, error) {
 	if c.mock {
-		// 按天固定，同一天内工作分配不变
-		day := time.Now().YearDay()
-		return mockAssignments[day%len(mockAssignments)], nil
+		return "你今天的任务是在南矿区采煤。早八点到岗，晚六点收工。注意安全，服从工头调度。", nil
 	}
 	// TODO: 实现 HTTP 调用
 	return "", nil

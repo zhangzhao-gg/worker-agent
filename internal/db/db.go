@@ -75,6 +75,15 @@ type Memory struct {
 	Type      string
 }
 
+type ReasoningLog struct {
+	ID        int64
+	SessionID string
+	Timestamp string
+	Round     int
+	Type      string
+	Content   string
+}
+
 // ================================================================
 //  构造 & 建表
 // ================================================================
@@ -152,6 +161,14 @@ func (d *Database) createTables() error {
 		id        INTEGER PRIMARY KEY AUTOINCREMENT,
 		timestamp TEXT NOT NULL,
 		content   TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS reasoning_logs (
+		id         INTEGER PRIMARY KEY AUTOINCREMENT,
+		session_id TEXT NOT NULL,
+		timestamp  TEXT NOT NULL,
+		round      INTEGER NOT NULL,
+		type       TEXT NOT NULL,
+		content    TEXT NOT NULL
 	);`
 	_, err := d.db.Exec(ddl)
 	return err
@@ -253,6 +270,38 @@ func (d *Database) InsertHeartbeats(entries []HeartbeatEntry) error {
 func (d *Database) UpdateHeartbeatStatus(id int64, status string) error {
 	_, err := d.db.Exec("UPDATE heartbeat_schedule SET status = ? WHERE id = ?", status, id)
 	return err
+}
+
+func (d *Database) DeleteHeartbeat(id int64) error {
+	_, err := d.db.Exec("DELETE FROM heartbeat_schedule WHERE id = ?", id)
+	return err
+}
+
+func (d *Database) ModifyHeartbeat(id int64, time, task string) error {
+	_, err := d.db.Exec("UPDATE heartbeat_schedule SET time = ?, task = ? WHERE id = ?", time, task, id)
+	return err
+}
+
+func (d *Database) UpdateSoulFields(updates map[string]string) error {
+	allowed := map[string]bool{
+		"background": true, "personality": true, "speech_style": true,
+		"values_desc": true, "family": true, "avatar": true, "occupation": true,
+	}
+	tx, err := d.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for field, value := range updates {
+		if !allowed[field] {
+			return fmt.Errorf("禁止修改字段: %s", field)
+		}
+		if _, err := tx.Exec(fmt.Sprintf("UPDATE soul SET %s = ? WHERE id = 1", field), value); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ================================================================
@@ -483,4 +532,34 @@ func (d *Database) GetRecentHeartbeats(n int) ([]HeartbeatEntry, error) {
 		entries = append(entries, e)
 	}
 	return entries, rows.Err()
+}
+
+// ================================================================
+//  Reasoning Logs
+// ================================================================
+
+func (d *Database) InsertReasoningLog(sessionID string, round int, logType string, content string) error {
+	_, err := d.db.Exec(
+		"INSERT INTO reasoning_logs (session_id, timestamp, round, type, content) VALUES (?, ?, ?, ?, ?)",
+		sessionID, time.Now().Format(time.RFC3339), round, logType, content)
+	return err
+}
+
+func (d *Database) GetRecentReasoningLogs(n int) ([]ReasoningLog, error) {
+	rows, err := d.db.Query(
+		`SELECT id, session_id, timestamp, round, type, content FROM reasoning_logs ORDER BY id DESC LIMIT ?`, n)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []ReasoningLog
+	for rows.Next() {
+		var l ReasoningLog
+		if err := rows.Scan(&l.ID, &l.SessionID, &l.Timestamp, &l.Round, &l.Type, &l.Content); err != nil {
+			return nil, err
+		}
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
 }

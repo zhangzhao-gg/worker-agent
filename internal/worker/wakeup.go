@@ -9,6 +9,7 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"log"
 	"sync"
 	"time"
@@ -33,6 +34,10 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 		case signal := <-wakeupCh:
 			log.Printf("[唤醒] 收到紧急信号: trigger=%s", signal.Trigger)
 			if err := handleWakeup(database, eng, signal.Trigger, signal.News, ""); err != nil {
+				if errors.Is(err, engine.ErrSelfDestruct) {
+					log.Println("[唤醒] ☠ 工人自我终结，协程退出")
+					return
+				}
 				log.Printf("[唤醒] 紧急唤醒失败: %v", err)
 			}
 
@@ -48,6 +53,10 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 			for _, entry := range entries {
 				log.Printf("[唤醒] 触发唤醒: id=%d, datetime=%s, reason=%s", entry.ID, entry.Datetime, entry.Reason)
 				if err := handleWakeup(database, eng, "scheduled_wakeup", "", entry.Reason); err != nil {
+					if errors.Is(err, engine.ErrSelfDestruct) {
+						log.Println("[唤醒] ☠ 工人自我终结，协程退出")
+						return
+					}
 					log.Printf("[唤醒] 唤醒失败，保留 pending 状态: %v", err)
 				} else {
 					database.MarkWakeupDone(entry.ID)
