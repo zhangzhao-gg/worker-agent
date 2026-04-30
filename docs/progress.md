@@ -37,6 +37,7 @@
 - `GET /api/workers/{name}` — 查询单个工人详情
 - `PUT /api/workers/{name}` — 修改工人人设
 - `POST /api/workers/{name}/wakeup` — 手动唤醒工人
+- `POST /api/workers/{name}/event` — 城市推送事件（自动紧急判断，条件唤醒）
 - `DELETE /api/workers/{name}` — 停止并删除工人
 - **CORS 支持**：Dashboard 跨域调用 Worker API
 - **重启自动恢复**：扫描 data/*.db，恢复所有工人协程 + 强制审视唤醒

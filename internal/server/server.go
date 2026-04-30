@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm
- * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理
- * [POS]: internal/server 的唯一成员，纯 API + 协程管理，Web UI 已分离至 cmd/dashboard
+ * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点
+ * [POS]: internal/server 的唯一成员，纯 API + 协程管理 + 城市事件接收，Web UI 已分离至 cmd/dashboard
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -43,6 +43,7 @@ type runningWorker struct {
 	Status   string             `json:"status"`
 	DBPath   string             `json:"db_path"`
 	database *db.Database
+	wakeupCh chan<- worker.WakeupSignal
 	cancel   context.CancelFunc
 }
 
@@ -133,6 +134,7 @@ func (s *Server) ListenAndServe(port int) error {
 	mux.HandleFunc("GET /api/workers/{name}", s.handleGet)
 	mux.HandleFunc("PUT /api/workers/{name}", s.handleUpdate)
 	mux.HandleFunc("POST /api/workers/{name}/wakeup", s.handleManualWakeup)
+	mux.HandleFunc("POST /api/workers/{name}/event", s.handlePushEvent)
 	mux.HandleFunc("DELETE /api/workers/{name}", s.handleDelete)
 
 	addr := fmt.Sprintf(":%d", port)
@@ -302,6 +304,46 @@ func (s *Server) handleManualWakeup(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[server] 手动唤醒: %s, reason=%s", name, body.Reason)
 }
 
+// POST /api/workers/{name}/event — 城市推送事件
+func (s *Server) handlePushEvent(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	slug := sanitizeName(name)
+
+	s.mu.RLock()
+	rw, exists := s.workers[slug]
+	s.mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "工人不存在: "+name, http.StatusNotFound)
+		return
+	}
+
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
+		http.Error(w, "content 为必填项", http.StatusBadRequest)
+		return
+	}
+
+	rw.database.InsertEvent(body.Content)
+
+	soul, err := rw.database.GetSoul()
+	urgent := err == nil && s.llmClient != nil && worker.CheckUrgency(s.llmClient, body.Content, soul)
+
+	if urgent {
+		select {
+		case rw.wakeupCh <- worker.WakeupSignal{Trigger: "urgent_news", News: body.Content}:
+		default:
+			log.Printf("[server] wakeupCh 已满，事件已存入 events 表等待下次唤醒: %s", name)
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"status": "received", "urgent": urgent})
+	log.Printf("[server] 推送事件: %s, urgent=%v, content=%s", name, urgent, body.Content)
+}
+
 // DELETE /api/workers/{name} — 停止并删除工人
 func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
@@ -340,6 +382,7 @@ func (s *Server) startWorker(name string, dbPath string, database *db.Database) 
 		Status:   "running",
 		DBPath:   dbPath,
 		database: database,
+		wakeupCh: wakeupCh,
 		cancel:   cancel,
 	}
 

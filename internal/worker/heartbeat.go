@@ -73,7 +73,7 @@ func processHeartbeats(database *db.Database, cityAPI *city.CityAPI, llmClient l
 			log.Printf("[心跳/%s] 收到 news: %s", workerID, resp.News)
 
 			soul, err := database.GetSoul()
-			if err == nil && checkUrgency(llmClient, resp.News, soul) {
+			if err == nil && CheckUrgency(llmClient, resp.News, soul) {
 				log.Printf("[心跳/%s] 紧急唤醒 LLM", workerID)
 				wakeupCh <- WakeupSignal{Trigger: "urgent_news", News: resp.News}
 			}
@@ -87,7 +87,7 @@ func processHeartbeats(database *db.Database, cityAPI *city.CityAPI, llmClient l
 //  紧急判断（复用同一 LLM，单轮简短 prompt）
 // ================================================================
 
-func checkUrgency(llmClient llm.Client, news string, soul db.Soul) bool {
+func CheckUrgency(llmClient llm.Client, news string, soul db.Soul) bool {
 	if llmClient == nil {
 		return false
 	}
