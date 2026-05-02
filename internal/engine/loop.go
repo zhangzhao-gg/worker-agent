@@ -62,6 +62,7 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 	log.Printf("║ 初始消息: %s", truncate(initialMessage, 120))
 	log.Println("╚══════════════════════════════════════════════════════════")
 
+	cfg.LogFn(0, "system_prompt", cfg.Prompt)
 	cfg.LogFn(0, "input", initialMessage)
 	roundsWithoutTodo := 0
 

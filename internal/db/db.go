@@ -515,6 +515,27 @@ func (d *Database) GetRecentNarratives(n int) ([]Narrative, error) {
 	return narratives, rows.Err()
 }
 
+func (d *Database) GetHeartbeatsByDateRange(fromDate, toDate string) ([]HeartbeatEntry, error) {
+	rows, err := d.db.Query(
+		`SELECT id, time, date, task, status FROM heartbeat_schedule
+		 WHERE date >= ? AND date <= ?
+		 ORDER BY date, time`, fromDate, toDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []HeartbeatEntry
+	for rows.Next() {
+		var e HeartbeatEntry
+		if err := rows.Scan(&e.ID, &e.Time, &e.Date, &e.Task, &e.Status); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
 func (d *Database) GetRecentHeartbeats(n int) ([]HeartbeatEntry, error) {
 	rows, err := d.db.Query(
 		`SELECT id, time, date, task, status FROM heartbeat_schedule ORDER BY date DESC, time DESC LIMIT ?`, n)

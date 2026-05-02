@@ -97,9 +97,14 @@ func buildInitialMessage(trigger string, ctx RunContext) string {
 
 	switch trigger {
 	case "scheduled_wakeup":
-		b.WriteString(fmt.Sprintf("你刚刚醒来。原因：%s\n", ctx.Reason))
+		hour := time.Now().Hour()
+		if hour >= 8 && hour < 18 {
+			b.WriteString(fmt.Sprintf("你停下手中的活，开始思考。原因：%s\n", ctx.Reason))
+		} else {
+			b.WriteString(fmt.Sprintf("你醒来了。原因：%s\n", ctx.Reason))
+		}
 	case "urgent_news":
-		b.WriteString(fmt.Sprintf("紧急消息打断了你的工作：%s\n", ctx.News))
+		b.WriteString(fmt.Sprintf("紧急消息打断了你：%s\n", ctx.News))
 	}
 
 	if ctx.WorkAssignment != "" {
@@ -114,6 +119,58 @@ func buildInitialMessage(trigger string, ctx RunContext) string {
 		b.WriteString("\n最近发生的事件：\n")
 		for _, e := range ctx.Events {
 			b.WriteString(fmt.Sprintf("- [%s] %s\n", e.Timestamp, e.Content))
+		}
+	}
+
+	if len(ctx.Heartbeats) > 0 {
+		b.WriteString("\n心跳计划概况（昨天 + 今天 + 明天）：\n")
+		type dayStat struct {
+			total, done, pending, skipped int
+			samples                       []string
+		}
+		days := make(map[string]*dayStat)
+		for _, h := range ctx.Heartbeats {
+			ds, ok := days[h.Date]
+			if !ok {
+				ds = &dayStat{}
+				days[h.Date] = ds
+			}
+			ds.total++
+			switch h.Status {
+			case "done":
+				ds.done++
+			case "pending":
+				ds.pending++
+			case "skipped":
+				ds.skipped++
+			}
+			if len(ds.samples) < 3 {
+				ds.samples = append(ds.samples, fmt.Sprintf("%s %s", h.Time, h.Task))
+			}
+		}
+		today := time.Now().Format("2006-01-02")
+		yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+		tomorrow := time.Now().AddDate(0, 0, 1).Format("2006-01-02")
+		for _, date := range []string{yesterday, today, tomorrow} {
+			ds, ok := days[date]
+			if !ok {
+				continue
+			}
+			label := date
+			if date == today {
+				label = date + "（今天）"
+			} else if date == yesterday {
+				label = date + "（昨天）"
+			} else if date == tomorrow {
+				label = date + "（明天）"
+			}
+			b.WriteString(fmt.Sprintf("  %s: 共%d条，完成%d/待执行%d/跳过%d\n", label, ds.total, ds.done, ds.pending, ds.skipped))
+			for _, s := range ds.samples {
+				b.WriteString(fmt.Sprintf("    · %s\n", s))
+			}
+			if ds.total > 3 {
+				b.WriteString(fmt.Sprintf("    · ...（还有%d条）\n", ds.total-3))
+			}
 		}
 	}
 

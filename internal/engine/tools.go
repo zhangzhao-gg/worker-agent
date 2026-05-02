@@ -31,7 +31,7 @@ var toolsJSON = `[
   {"name":"get_my_work_assignment","description":"获取今天城市分配给你的工作任务。","input_schema":{"type":"object","properties":{}}},
   {"name":"get_recent_events","description":"回忆最近发生的事件。","input_schema":{"type":"object","properties":{"n":{"type":"integer","description":"返回条数"}},"required":["n"]}},
   {"name":"get_memories","description":"回忆自己之前的想法和记忆。","input_schema":{"type":"object","properties":{"n":{"type":"integer","description":"返回条数"}},"required":["n"]}},
-  {"name":"write_heartbeat_schedule","description":"批量写入今天的心跳计划。每条含时间和任务描述。","input_schema":{"type":"object","properties":{"entries":{"type":"array","items":{"type":"object","properties":{"time":{"type":"string","description":"HH:MM 格式"},"task":{"type":"string","description":"心跳任务描述"}},"required":["time","task"]}}},"required":["entries"]}},
+  {"name":"write_heartbeat_schedule","description":"批量写入心跳计划。每条含时间和任务描述。date 可选，不填则默认今天。","input_schema":{"type":"object","properties":{"date":{"type":"string","description":"YYYY-MM-DD 格式，指定哪天的计划。不填则为今天"},"entries":{"type":"array","items":{"type":"object","properties":{"time":{"type":"string","description":"HH:MM 格式"},"task":{"type":"string","description":"心跳任务描述"}},"required":["time","task"]}}},"required":["entries"]}},
   {"name":"update_heartbeat_schedule","description":"增删改心跳计划中的条目。","input_schema":{"type":"object","properties":{"changes":{"type":"array","items":{"type":"object","properties":{"id":{"type":"integer","description":"计划条目 ID"},"action":{"type":"string","enum":["add","modify","delete"]},"time":{"type":"string"},"task":{"type":"string"}},"required":["action"]}}},"required":["changes"]}},
   {"name":"schedule_wakeup","description":"安排未来某个时间点唤醒你的大脑进行思考。同一小时内不会重复安排。","input_schema":{"type":"object","properties":{"datetime":{"type":"string","description":"ISO 格式时间"},"reason":{"type":"string","description":"唤醒原因"}},"required":["datetime","reason"]}},
   {"name":"cancel_wakeup","description":"取消一个不再需要的唤醒计划（只能取消 pending 状态的）。","input_schema":{"type":"object","properties":{"id":{"type":"integer","description":"唤醒计划的 ID"}},"required":["id"]}},
@@ -106,15 +106,19 @@ func (e *Engine) handleWriteHeartbeats(input map[string]any) (string, error) {
 	}
 	json.Unmarshal(raw, &entries)
 
-	today := time.Now().Format("2006-01-02")
+	date, _ := input["date"].(string)
+	if date == "" {
+		date = time.Now().Format("2006-01-02")
+	}
+
 	var dbEntries []db.HeartbeatEntry
 	for _, en := range entries {
-		dbEntries = append(dbEntries, db.HeartbeatEntry{Time: en.Time, Date: today, Task: en.Task})
+		dbEntries = append(dbEntries, db.HeartbeatEntry{Time: en.Time, Date: date, Task: en.Task})
 	}
 	if err := e.db.InsertHeartbeats(dbEntries); err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("写入 %d 条心跳计划", len(entries)), nil
+	return fmt.Sprintf("写入 %d 条心跳计划 (date=%s)", len(entries), date), nil
 }
 
 func (e *Engine) handleUpdateHeartbeats(input map[string]any) (string, error) {

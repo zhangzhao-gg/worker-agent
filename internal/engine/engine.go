@@ -36,6 +36,7 @@ type RunContext struct {
 	Summary        string
 	Events         []db.Event
 	Wakeups        []db.WakeupEntry
+	Heartbeats     []db.HeartbeatEntry
 	WorkAssignment string
 	Reason         string
 	News           string

@@ -87,15 +87,20 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 	rangeFrom := now.AddDate(0, 0, -3).Format(time.RFC3339)
 	rangeTo := now.AddDate(0, 0, 3).Format(time.RFC3339)
 	wakeups, _ := database.GetWakeupRange(rangeFrom, rangeTo)
-	log.Printf("[唤醒] 上下文: summary长度=%d, 未处理事件=%d, 唤醒记录=%d", len(summary), len(events), len(wakeups))
+
+	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
+	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
+	heartbeats, _ := database.GetHeartbeatsByDateRange(yesterday, tomorrow)
+	log.Printf("[唤醒] 上下文: summary长度=%d, 未处理事件=%d, 唤醒记录=%d, 心跳=%d", len(summary), len(events), len(wakeups), len(heartbeats))
 
 	ctx := engine.RunContext{
-		Soul:    soul,
-		Summary: summary,
-		Events:  events,
-		Wakeups: wakeups,
-		Reason:  reason,
-		News:    news,
+		Soul:       soul,
+		Summary:    summary,
+		Events:     events,
+		Wakeups:    wakeups,
+		Heartbeats: heartbeats,
+		Reason:     reason,
+		News:       news,
 	}
 
 	log.Println("[唤醒] 调用推理引擎 eng.Run()...")

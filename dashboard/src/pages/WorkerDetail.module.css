@@ -90,11 +90,13 @@
 .sessionDetailScroll { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
 
 .reasoningItem { padding-left: 0.75rem; border-left: 3px solid var(--border-light); }
+.type_system_prompt { border-left-color: #6366f1; }
 .type_llm_text { border-left-color: var(--accent); }
 .type_tool_call { border-left-color: #f59e0b; }
 .type_tool_result { border-left-color: #16a34a; }
 .type_finish { border-left-color: #ef4444; }
 .reasoningContent { font-size: 0.82rem; white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.02); padding: 0.75rem; border: 1px solid var(--border-light); line-height: 1.5; font-family: var(--font); margin-top: 0.4rem; }
+.badge_system_prompt { border-color: #6366f1; color: #6366f1; }
 .badge_llm_text { border-color: var(--accent); color: var(--accent); }
 .badge_tool_call { border-color: #f59e0b; color: #d97706; }
 .badge_tool_result { border-color: #16a34a; color: #16a34a; }
