@@ -70,13 +70,15 @@ export default function WorkerDetail({ name, onBack }) {
     try {
       const resp = await fetch(`/api/workers/${name}/reset`, { method: 'POST' })
       if (resp.ok) {
-        setMsg('Reset complete')
-        fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker)
+        location.reload()
       } else {
         setMsg('Failed: ' + await resp.text())
+        setTimeout(() => setMsg(''), 3000)
       }
-    } catch (e) { setMsg('Failed: ' + e.message) }
-    setTimeout(() => setMsg(''), 3000)
+    } catch (e) {
+      setMsg('Failed: ' + e.message)
+      setTimeout(() => setMsg(''), 3000)
+    }
   }
 
   if (!worker) return <div className={styles.loading}>Loading...</div>
