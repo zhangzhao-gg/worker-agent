@@ -9,6 +9,8 @@ export default function WorkerDetail({ name, onBack }) {
   const [worker, setWorker] = useState(null)
   const [wakeupReason, setWakeupReason] = useState('')
   const [msg, setMsg] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({})
 
   useEffect(() => {
     fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker).catch(() => {})
@@ -28,6 +30,51 @@ export default function WorkerDetail({ name, onBack }) {
       })
       setMsg('Wakeup scheduled')
       setWakeupReason('')
+    } catch (e) { setMsg('Failed: ' + e.message) }
+    setTimeout(() => setMsg(''), 3000)
+  }
+
+  function startEdit() {
+    const s = worker?.soul || {}
+    setEditForm({
+      occupation: s.occupation || '',
+      background: s.background || '',
+      personality: s.personality || '',
+      speech_style: s.speech_style || '',
+      values_desc: s.values_desc || '',
+      family: s.family || ''
+    })
+    setEditing(true)
+  }
+
+  async function saveEdit() {
+    try {
+      const resp = await fetch(`/api/workers/${name}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editForm)
+      })
+      if (resp.ok) {
+        setEditing(false)
+        setMsg('Dossier updated')
+        fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker)
+      } else {
+        setMsg('Failed: ' + await resp.text())
+      }
+    } catch (e) { setMsg('Failed: ' + e.message) }
+    setTimeout(() => setMsg(''), 3000)
+  }
+
+  async function doReset() {
+    if (!confirm('确定要重置？将清除该工人除人设以外的所有数据（叙事、记忆、事件、心跳、唤醒、推理日志）。')) return
+    try {
+      const resp = await fetch(`/api/workers/${name}/reset`, { method: 'POST' })
+      if (resp.ok) {
+        setMsg('Reset complete')
+        fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker)
+      } else {
+        setMsg('Failed: ' + await resp.text())
+      }
     } catch (e) { setMsg('Failed: ' + e.message) }
     setTimeout(() => setMsg(''), 3000)
   }
@@ -52,7 +99,10 @@ export default function WorkerDetail({ name, onBack }) {
             <span className={styles.label}>WORKER DOSSIER · {worker.status}</span>
             <h1 className={styles.title}>Dossier: {soul.name || name}</h1>
           </div>
-          <button className={styles.backBtn} onClick={onBack}>&larr; BACK</button>
+          <div className={styles.headerActions}>
+            <button className={styles.resetBtn} onClick={doReset}>RESET</button>
+            <button className={styles.backBtn} onClick={onBack}>&larr; BACK</button>
+          </div>
         </header>
 
         <div className={styles.layout}>
@@ -73,12 +123,33 @@ export default function WorkerDetail({ name, onBack }) {
             </div>
 
             <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>BACKGROUND DOSSIER</h3>
-              {soul.background && <Field label="BACKGROUND" value={soul.background} />}
-              {soul.personality && <Field label="PERSONALITY" value={soul.personality} />}
-              {soul.speech_style && <Field label="SPEECH STYLE" value={soul.speech_style} />}
-              {soul.values_desc && <Field label="VALUES" value={soul.values_desc} />}
-              {soul.family && <Field label="FAMILY" value={soul.family} />}
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>BACKGROUND DOSSIER</h3>
+                {!editing && <button className={styles.btnSmall} onClick={startEdit}>EDIT</button>}
+              </div>
+              {editing ? (
+                <div className={styles.editForm}>
+                  <EditField label="OCCUPATION" value={editForm.occupation} onChange={v => setEditForm(f => ({ ...f, occupation: v }))} />
+                  <EditField label="BACKGROUND" value={editForm.background} onChange={v => setEditForm(f => ({ ...f, background: v }))} textarea />
+                  <EditField label="PERSONALITY" value={editForm.personality} onChange={v => setEditForm(f => ({ ...f, personality: v }))} textarea />
+                  <EditField label="SPEECH STYLE" value={editForm.speech_style} onChange={v => setEditForm(f => ({ ...f, speech_style: v }))} textarea />
+                  <EditField label="VALUES" value={editForm.values_desc} onChange={v => setEditForm(f => ({ ...f, values_desc: v }))} textarea />
+                  <EditField label="FAMILY" value={editForm.family} onChange={v => setEditForm(f => ({ ...f, family: v }))} textarea />
+                  <div className={styles.editActions}>
+                    <button className={styles.btn} onClick={saveEdit}>SAVE</button>
+                    <button className={styles.btnMuted} onClick={() => setEditing(false)}>CANCEL</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {soul.occupation && <Field label="OCCUPATION" value={soul.occupation} />}
+                  {soul.background && <Field label="BACKGROUND" value={soul.background} />}
+                  {soul.personality && <Field label="PERSONALITY" value={soul.personality} />}
+                  {soul.speech_style && <Field label="SPEECH STYLE" value={soul.speech_style} />}
+                  {soul.values_desc && <Field label="VALUES" value={soul.values_desc} />}
+                  {soul.family && <Field label="FAMILY" value={soul.family} />}
+                </>
+              )}
             </div>
 
             <div className={styles.section}>
@@ -308,6 +379,19 @@ function Field({ label, value }) {
     <div className={styles.field}>
       <span className={styles.fieldLabel}>{label}</span>
       <p>{value}</p>
+    </div>
+  )
+}
+
+function EditField({ label, value, onChange, textarea }) {
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      {textarea ? (
+        <textarea className={styles.textarea} value={value} onChange={e => onChange(e.target.value)} rows={3} />
+      ) : (
+        <input className={styles.input} value={value} onChange={e => onChange(e.target.value)} />
+      )}
     </div>
   )
 }

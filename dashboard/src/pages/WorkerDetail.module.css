@@ -9,8 +9,11 @@
 .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 2rem; }
 .label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 0.5rem; }
 .title { font-size: 2.5rem; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+.headerActions { display: flex; gap: 0.5rem; }
 .backBtn { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--border); background: transparent; padding: 0.5rem 1rem; cursor: pointer; }
 .backBtn:hover { background: rgba(139, 115, 85, 0.1); }
+.resetBtn { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #b91c1c; border: 1px solid #ef4444; background: transparent; padding: 0.5rem 1rem; cursor: pointer; }
+.resetBtn:hover { background: rgba(239, 68, 68, 0.08); }
 .loading { padding: 3rem; text-align: center; font-style: italic; color: var(--muted); }
 
 /* 布局 */
@@ -25,7 +28,17 @@
 .occupation { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-top: 0.25rem; }
 .statusBar { text-transform: uppercase; letter-spacing: 0.05em; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.5rem 2rem; margin-top: 1rem; font-size: 0.9rem; }
 .section { display: flex; flex-direction: column; gap: 0.75rem; }
+.sectionHeader { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.sectionHeader .sectionTitle { border-bottom: none; padding-bottom: 0; }
 .sectionTitle { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+.btnSmall { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--border); background: transparent; padding: 0.2rem 0.5rem; cursor: pointer; }
+.btnSmall:hover { background: rgba(139, 115, 85, 0.1); }
+.btnMuted { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border-light); background: transparent; padding: 0.5rem 1rem; cursor: pointer; }
+.btnMuted:hover { background: rgba(0, 0, 0, 0.03); }
+.editForm { display: flex; flex-direction: column; gap: 0.75rem; }
+.editActions { display: flex; gap: 0.5rem; }
+.textarea { width: 100%; border: 1px solid var(--border); background: transparent; padding: 0.5rem 0.75rem; font-family: var(--font); font-size: 0.9rem; outline: none; resize: vertical; min-height: 60px; }
+.textarea:focus { border-color: var(--accent); }
 
 /* Meters */
 .meter { display: flex; flex-direction: column; gap: 0.2rem; }

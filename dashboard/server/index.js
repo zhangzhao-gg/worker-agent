@@ -148,6 +148,30 @@ app.put('/api/workers/:name', async (req, res) => {
   } catch (e) { res.status(502).json({ error: e.message }) }
 })
 
+app.post('/api/workers/:name/reset', (req, res) => {
+  const dbPath = join(DATA_DIR, `${req.params.name}.db`)
+  if (!existsSync(dbPath)) return res.status(404).json({ error: 'not found' })
+  try {
+    // 关闭只读连接
+    if (conns.has(req.params.name)) {
+      conns.get(req.params.name).close()
+      conns.delete(req.params.name)
+    }
+    // 写模式打开，清除 soul 以外的表
+    const wdb = new Database(dbPath)
+    wdb.exec(`
+      DELETE FROM narratives;
+      DELETE FROM memories;
+      DELETE FROM events;
+      DELETE FROM heartbeat_schedule;
+      DELETE FROM wakeup_schedule;
+      DELETE FROM reasoning_logs;
+    `)
+    wdb.close()
+    res.json({ status: 'reset' })
+  } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
 app.get('/api/config', (req, res) => {
   res.json({ workerAPI: WORKER_API })
 })
