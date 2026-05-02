@@ -80,6 +80,13 @@
 .table th { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; text-align: left; padding: 0.75rem 1rem 0.75rem 0; border-bottom: 1px solid var(--border); }
 .table td { padding: 0.75rem 1rem 0.75rem 0; border-bottom: 1px solid var(--border-light); font-size: 0.9rem; }
 
+/* Pagination */
+.pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem 0; }
+.pageBtn { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--border); background: transparent; padding: 0.4rem 0.8rem; cursor: pointer; }
+.pageBtn:hover:not(:disabled) { background: rgba(139, 115, 85, 0.1); }
+.pageBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+.pageInfo { font-size: 0.8rem; font-weight: 500; color: var(--muted); }
+
 /* Reasoning — 左右分栏 */
 .reasoningContainer { display: flex; height: calc(100vh - 280px); min-height: 400px; gap: 1px; border: 1px solid var(--border); }
 

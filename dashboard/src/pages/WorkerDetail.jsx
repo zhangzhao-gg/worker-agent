@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './WorkerDetail.module.css'
 
 const TABS = ['narrative', 'memory', 'event', 'schedule', 'wakeup', 'reasoning']
@@ -336,34 +336,64 @@ function ReasoningTab({ name }) {
 // ================================================================
 
 function ScheduleTable({ data }) {
+  const PAGE_SIZE = 30
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(data.length / PAGE_SIZE)
+  const slice = data.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   return (
-    <table className={styles.table}>
-      <thead><tr><th>DATE</th><th>TIME</th><th>TASK</th><th>STATUS</th></tr></thead>
-      <tbody>
-        {data.map(r => (
-          <tr key={r.id}>
-            <td>{r.date}</td><td>{r.time}</td><td>{r.task}</td>
-            <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div>
+      <table className={styles.table}>
+        <thead><tr><th>DATE</th><th>TIME</th><th>TASK</th><th>STATUS</th></tr></thead>
+        <tbody>
+          {slice.map(r => (
+            <tr key={r.id}>
+              <td>{r.date}</td><td>{r.time}</td><td>{r.task}</td>
+              <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
+    </div>
   )
 }
 
 function WakeupTable({ data }) {
+  const PAGE_SIZE = 20
+  const [page, setPage] = useState(0)
+  const totalPages = Math.ceil(data.length / PAGE_SIZE)
+  const slice = data.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+
   return (
-    <table className={styles.table}>
-      <thead><tr><th>DATETIME</th><th>REASON</th><th>STATUS</th></tr></thead>
-      <tbody>
-        {data.map(r => (
-          <tr key={r.id}>
-            <td>{fmtTime(r.datetime)}</td><td>{r.reason}</td>
-            <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div>
+      <table className={styles.table}>
+        <thead><tr><th>DATETIME</th><th>REASON</th><th>STATUS</th></tr></thead>
+        <tbody>
+          {slice.map(r => (
+            <tr key={r.id}>
+              <td>{fmtTime(r.datetime)}</td><td>{r.reason}</td>
+              <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {totalPages > 1 && (
+        <Pagination page={page} totalPages={totalPages} onChange={setPage} />
+      )}
+    </div>
+  )
+}
+
+function Pagination({ page, totalPages, onChange }) {
+  return (
+    <div className={styles.pagination}>
+      <button className={styles.pageBtn} disabled={page === 0} onClick={() => onChange(page - 1)}>&laquo; PREV</button>
+      <span className={styles.pageInfo}>{page + 1} / {totalPages}</span>
+      <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => onChange(page + 1)}>NEXT &raquo;</button>
+    </div>
   )
 }
 

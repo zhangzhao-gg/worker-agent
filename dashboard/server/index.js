@@ -100,7 +100,7 @@ app.get('/api/workers/:name/events', (req, res) => {
 app.get('/api/workers/:name/heartbeats', (req, res) => {
   const db = getDB(req.params.name)
   if (!db) return res.status(404).json({ error: 'not found' })
-  const limit = Math.min(parseInt(req.query.limit) || 50, 200)
+  const limit = Math.min(parseInt(req.query.limit) || 200, 500)
   res.json(db.prepare('SELECT * FROM heartbeat_schedule ORDER BY date DESC, time DESC LIMIT ?').all(limit))
 })
 
