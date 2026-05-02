@@ -436,12 +436,12 @@ async function saveDossier() {
     }
 }
 
-// ── 自动刷新 ──
+// ── 自动刷新（reasoning 关闭，避免滚动位置丢失）──
 (function() {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab') || 'narrative';
-    const interval = tab === 'reasoning' ? 5000 : 30000;
-    setTimeout(() => location.reload(), interval);
+    if (tab === 'reasoning') return;
+    setTimeout(() => location.reload(), 30000);
 })();
 </script>
 </body>

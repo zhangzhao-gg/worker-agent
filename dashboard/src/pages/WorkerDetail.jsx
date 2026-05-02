@@ -1,0 +1,321 @@
+import { useState, useEffect, useRef, useMemo } from 'react'
+import styles from './WorkerDetail.module.css'
+
+const TABS = ['narrative', 'memory', 'event', 'schedule', 'wakeup', 'reasoning']
+const TAB_LABELS = { narrative: 'NARRATIVE LOG', memory: 'PRIVATE MEMORY', event: 'CITY EVENTS', schedule: 'WORK SCHEDULE', wakeup: 'WAKEUP SCHEDULE', reasoning: 'REASONING' }
+
+export default function WorkerDetail({ name, onBack }) {
+  const [tab, setTab] = useState('narrative')
+  const [worker, setWorker] = useState(null)
+  const [wakeupReason, setWakeupReason] = useState('')
+  const [msg, setMsg] = useState('')
+
+  useEffect(() => {
+    fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker).catch(() => {})
+    const timer = setInterval(() => {
+      fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker).catch(() => {})
+    }, 15000)
+    return () => clearInterval(timer)
+  }, [name])
+
+  async function doWakeup() {
+    const reason = wakeupReason || '手动唤醒'
+    try {
+      await fetch(`/api/workers/${name}/wakeup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      setMsg('Wakeup scheduled')
+      setWakeupReason('')
+    } catch (e) { setMsg('Failed: ' + e.message) }
+    setTimeout(() => setMsg(''), 3000)
+  }
+
+  if (!worker) return <div className={styles.loading}>Loading...</div>
+
+  const soul = worker.soul || {}
+
+  return (
+    <div className={styles.container}>
+      <nav className={styles.nav}>
+        <div className={styles.logo}>WORKER ARCHIVE</div>
+        <div className={styles.navLinks}>
+          <a onClick={onBack}>CATALOGUE</a>
+          <span className={styles.navActive}>ENTRIES</span>
+        </div>
+      </nav>
+
+      <main className={styles.main}>
+        <header className={styles.header}>
+          <div>
+            <span className={styles.label}>WORKER DOSSIER · {worker.status}</span>
+            <h1 className={styles.title}>Dossier: {soul.name || name}</h1>
+          </div>
+          <button className={styles.backBtn} onClick={onBack}>&larr; BACK</button>
+        </header>
+
+        <div className={styles.layout}>
+          {/* 左栏 */}
+          <aside className={styles.sidebar}>
+            <div className={styles.avatarSection}>
+              <div className={styles.avatarLg}>{(soul.name || name)[0]?.toUpperCase()}</div>
+              <h2 className={styles.soulName}>{soul.name}</h2>
+              <div className={styles.occupation}>{soul.occupation}</div>
+              <div className={styles.statusBar}>Status: {worker.status}</div>
+            </div>
+
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>VITAL METRICS</h3>
+              <Meter label="Mood" value={soul.mood} />
+              <Meter label="Hope" value={soul.hope} />
+              <Meter label="Grievance" value={soul.grievance} />
+            </div>
+
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>BACKGROUND DOSSIER</h3>
+              {soul.background && <Field label="BACKGROUND" value={soul.background} />}
+              {soul.personality && <Field label="PERSONALITY" value={soul.personality} />}
+              {soul.speech_style && <Field label="SPEECH STYLE" value={soul.speech_style} />}
+              {soul.values_desc && <Field label="VALUES" value={soul.values_desc} />}
+              {soul.family && <Field label="FAMILY" value={soul.family} />}
+            </div>
+
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>MANUAL WAKEUP</h3>
+              <div className={styles.wakeupRow}>
+                <input
+                  value={wakeupReason}
+                  onChange={e => setWakeupReason(e.target.value)}
+                  placeholder="唤醒原因..."
+                  className={styles.input}
+                  onKeyDown={e => e.key === 'Enter' && doWakeup()}
+                />
+                <button onClick={doWakeup} className={styles.btn}>WAKE</button>
+              </div>
+              {msg && <div className={styles.msg}>{msg}</div>}
+            </div>
+          </aside>
+
+          {/* 右栏 */}
+          <div className={styles.content}>
+            <div className={styles.tabs}>
+              {TABS.map(t => (
+                <button key={t} className={`${styles.tab} ${tab === t ? styles.tabActive : ''}`} onClick={() => setTab(t)}>
+                  {TAB_LABELS[t]}
+                </button>
+              ))}
+            </div>
+            <TabContent name={name} tab={tab} />
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+// ================================================================
+//  标签页内容（独立组件，各自管理轮询）
+// ================================================================
+
+function TabContent({ name, tab }) {
+  if (tab === 'reasoning') return <ReasoningTab name={name} />
+  return <GenericTab name={name} tab={tab} />
+}
+
+function GenericTab({ name, tab }) {
+  const [data, setData] = useState([])
+  const endpointMap = { narrative: 'narratives', memory: 'memories', event: 'events', schedule: 'heartbeats', wakeup: 'wakeups' }
+
+  useEffect(() => {
+    const load = () => fetch(`/api/workers/${name}/${endpointMap[tab]}`).then(r => r.json()).then(setData).catch(() => {})
+    load()
+    const timer = setInterval(load, 15000)
+    return () => clearInterval(timer)
+  }, [name, tab])
+
+  if (!data.length) return <p className={styles.empty}>No data yet.</p>
+
+  if (tab === 'schedule') return <ScheduleTable data={data} />
+  if (tab === 'wakeup') return <WakeupTable data={data} />
+
+  return (
+    <div className={styles.logList}>
+      {data.map(item => (
+        <article key={item.id} className={styles.logItem}>
+          <div className={styles.logMeta}>
+            <span>{fmtTime(item.timestamp || item.datetime)}</span>
+            {item.type && <span className={styles.badge}>{item.type}</span>}
+            {item.processed !== undefined && (
+              <span className={item.processed ? styles.badgeDone : styles.badgeWarn}>
+                {item.processed ? 'PROCESSED' : 'UNPROCESSED'}
+              </span>
+            )}
+          </div>
+          <p className={styles.logContent}>{item.content}</p>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+// ================================================================
+//  Reasoning Tab — 按 session 分组，左列表右详情
+// ================================================================
+
+function ReasoningTab({ name }) {
+  const [logs, setLogs] = useState([])
+  const [selectedSession, setSelectedSession] = useState(null)
+  const detailRef = useRef(null)
+
+  useEffect(() => {
+    const load = () => fetch(`/api/workers/${name}/reasoning?limit=500`)
+      .then(r => r.json())
+      .then(rows => setLogs(rows.sort((a, b) => a.id - b.id)))
+      .catch(() => {})
+    load()
+    const timer = setInterval(load, 5000)
+    return () => clearInterval(timer)
+  }, [name])
+
+  const sessions = useMemo(() => {
+    const map = new Map()
+    for (const log of logs) {
+      if (!map.has(log.session_id)) {
+        map.set(log.session_id, { id: log.session_id, startTime: log.timestamp, rounds: log.round, logs: [] })
+      }
+      const s = map.get(log.session_id)
+      s.logs.push(log)
+      if (log.round > s.rounds) s.rounds = log.round
+    }
+    return [...map.values()].reverse()
+  }, [logs])
+
+  // 自动选中最新 session
+  useEffect(() => {
+    if (!selectedSession && sessions.length) setSelectedSession(sessions[0].id)
+  }, [sessions, selectedSession])
+
+  const activeLogs = useMemo(() => {
+    const s = sessions.find(s => s.id === selectedSession)
+    return s ? s.logs : []
+  }, [sessions, selectedSession])
+
+  function copySession(logs) {
+    const text = logs.map(l => `[R${l.round}] [${l.type}] ${l.timestamp}\n${l.content}`).join('\n\n---\n\n')
+    navigator.clipboard.writeText(text)
+  }
+
+  return (
+    <div className={styles.reasoningContainer}>
+      {/* 左侧 session 列表 */}
+      <div className={styles.sessionList}>
+        <div className={styles.sessionListHeader}>SESSIONS ({sessions.length})</div>
+        <div className={styles.sessionListScroll}>
+          {sessions.map(s => (
+            <div
+              key={s.id}
+              className={`${styles.sessionItem} ${selectedSession === s.id ? styles.sessionActive : ''}`}
+              onClick={() => setSelectedSession(s.id)}
+            >
+              <div className={styles.sessionTime}>{fmtTime(s.startTime)}</div>
+              <div className={styles.sessionMeta}>
+                <span>{s.rounds} rounds</span>
+                <span>{s.logs.length} entries</span>
+              </div>
+              <div className={styles.sessionId}>{s.id.slice(0, 8)}...</div>
+            </div>
+          ))}
+          {!sessions.length && <p className={styles.empty}>No sessions yet.</p>}
+        </div>
+      </div>
+
+      {/* 右侧详情 */}
+      <div className={styles.sessionDetail}>
+        {activeLogs.length ? (
+          <>
+            <div className={styles.sessionDetailHeader}>
+              <button className={styles.copyBtn} onClick={() => copySession(activeLogs)}>COPY ALL</button>
+            </div>
+            <div ref={detailRef} className={styles.sessionDetailScroll}>
+              {activeLogs.map(log => (
+                <div key={log.id} className={`${styles.reasoningItem} ${styles[`type_${log.type}`] || ''}`}>
+                  <div className={styles.logMeta}>
+                    <span>{fmtTime(log.timestamp)}</span>
+                    <span className={styles.badge}>R{log.round}</span>
+                    <span className={`${styles.badge} ${styles[`badge_${log.type}`] || ''}`}>{log.type}</span>
+                  </div>
+                  <pre className={styles.reasoningContent}>{log.content}</pre>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className={styles.empty}>Select a session to view reasoning chain.</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ================================================================
+//  子组件
+// ================================================================
+
+function ScheduleTable({ data }) {
+  return (
+    <table className={styles.table}>
+      <thead><tr><th>DATE</th><th>TIME</th><th>TASK</th><th>STATUS</th></tr></thead>
+      <tbody>
+        {data.map(r => (
+          <tr key={r.id}>
+            <td>{r.date}</td><td>{r.time}</td><td>{r.task}</td>
+            <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function WakeupTable({ data }) {
+  return (
+    <table className={styles.table}>
+      <thead><tr><th>DATETIME</th><th>REASON</th><th>STATUS</th></tr></thead>
+      <tbody>
+        {data.map(r => (
+          <tr key={r.id}>
+            <td>{fmtTime(r.datetime)}</td><td>{r.reason}</td>
+            <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+}
+
+function Meter({ label, value }) {
+  return (
+    <div className={styles.meter}>
+      <div className={styles.meterLabel}><span>{label}</span><span>{value}</span></div>
+      <div className={styles.meterBar}><div className={styles.meterFill} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>
+    </div>
+  )
+}
+
+function Field({ label, value }) {
+  return (
+    <div className={styles.field}>
+      <span className={styles.fieldLabel}>{label}</span>
+      <p>{value}</p>
+    </div>
+  )
+}
+
+function fmtTime(s) {
+  if (!s) return ''
+  try {
+    const d = new Date(s)
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+  } catch { return s }
+}

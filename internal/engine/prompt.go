@@ -120,7 +120,7 @@ func buildInitialMessage(trigger string, ctx RunContext) string {
 	if len(ctx.Wakeups) > 0 {
 		b.WriteString("\n已有的唤醒计划（过去3天 + 未来3天），请勿重复安排相同时间段的唤醒：\n")
 		for _, w := range ctx.Wakeups {
-			b.WriteString(fmt.Sprintf("- [%s] %s（%s）\n", w.Datetime, w.Reason, w.Status))
+			b.WriteString(fmt.Sprintf("- [id=%d] [%s] %s（%s）\n", w.ID, w.Datetime, w.Reason, w.Status))
 		}
 	}
 
