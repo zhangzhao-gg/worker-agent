@@ -9,8 +9,8 @@ internal/llm/    - LLM 抽象层，Client 接口 + MiniMax 实现
 internal/engine/ - LLM 推理引擎，agent loop + tool dispatch + 压缩 + todo + 推理日志
 internal/worker/ - 双协程，心跳协程（身体）+ 唤醒调度协程（大脑入口）+ 紧急判断
 internal/server/ - 纯 HTTP API + 工人生命周期管理 + 事件推送端点，DB 持久化重启自动恢复
-dashboard/       - Node.js 独立 Dashboard（Vite + React + better-sqlite3），纯只读直连 data/*.db
-docs/            - 设计文档，PRD + 业务层 + 推理引擎 + s_full.py 参考实现
+dashboard/       - Node.js 独立 Dashboard（Vite + React + Express + better-sqlite3），直连 data/*.db 读写，安全码保护写操作
+docs/            - 设计文档，PRD + 业务层 + 推理引擎 + 部署手册 + s_full.py 参考实现
 </directory>
 
 <config>
