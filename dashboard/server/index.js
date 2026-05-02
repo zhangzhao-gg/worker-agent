@@ -13,6 +13,13 @@ import { join, resolve } from 'path'
 
 const DATA_DIR = resolve(process.env.DATA_DIR || '../data')
 const PORT = process.env.PORT || 3001
+const ADMIN_CODE = process.env.ADMIN_CODE || ''
+
+function requireAdmin(req, res, next) {
+  if (!ADMIN_CODE) return next()
+  if (req.headers['x-admin-code'] === ADMIN_CODE) return next()
+  res.status(403).json({ error: 'invalid admin code' })
+}
 
 const app = express()
 app.use(cors())
@@ -139,7 +146,7 @@ app.post('/api/workers/:name/wakeup', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.put('/api/workers/:name', (req, res) => {
+app.put('/api/workers/:name', requireAdmin, (req, res) => {
   const dbPath = join(DATA_DIR, `${req.params.name}.db`)
   if (!existsSync(dbPath)) return res.status(404).json({ error: 'not found' })
 
@@ -163,7 +170,7 @@ app.put('/api/workers/:name', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.post('/api/workers/:name/reset', (req, res) => {
+app.post('/api/workers/:name/reset', requireAdmin, (req, res) => {
   const dbPath = join(DATA_DIR, `${req.params.name}.db`)
   if (!existsSync(dbPath)) return res.status(404).json({ error: 'not found' })
   try {
@@ -185,6 +192,11 @@ app.post('/api/workers/:name/reset', (req, res) => {
     wdb.close()
     res.json({ status: 'reset' })
   } catch (e) { res.status(500).json({ error: e.message }) }
+})
+
+app.post('/api/auth/verify', (req, res) => {
+  if (!ADMIN_CODE) return res.json({ ok: true })
+  res.json({ ok: req.body.code === ADMIN_CODE })
 })
 
 app.listen(PORT, () => {

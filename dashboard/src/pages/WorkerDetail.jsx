@@ -11,6 +11,9 @@ export default function WorkerDetail({ name, onBack }) {
   const [msg, setMsg] = useState('')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState({})
+  const [adminCode, setAdminCode] = useState('')
+  const [adminVerified, setAdminVerified] = useState(false)
+  const [codeInput, setCodeInput] = useState('')
 
   useEffect(() => {
     fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker).catch(() => {})
@@ -19,6 +22,25 @@ export default function WorkerDetail({ name, onBack }) {
     }, 15000)
     return () => clearInterval(timer)
   }, [name])
+
+  async function verifyCode() {
+    try {
+      const resp = await fetch('/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeInput })
+      })
+      const data = await resp.json()
+      if (data.ok) {
+        setAdminCode(codeInput)
+        setAdminVerified(true)
+        setMsg('Admin verified')
+      } else {
+        setMsg('Invalid code')
+      }
+    } catch { setMsg('Verify failed') }
+    setTimeout(() => setMsg(''), 3000)
+  }
 
   async function doWakeup() {
     const reason = wakeupReason || '手动唤醒'
@@ -51,7 +73,7 @@ export default function WorkerDetail({ name, onBack }) {
     try {
       const resp = await fetch(`/api/workers/${name}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-admin-code': adminCode },
         body: JSON.stringify(editForm)
       })
       if (resp.ok) {
@@ -68,7 +90,10 @@ export default function WorkerDetail({ name, onBack }) {
   async function doReset() {
     if (!confirm('确定要重置？将清除该工人除人设以外的所有数据（叙事、记忆、事件、心跳、唤醒、推理日志）。')) return
     try {
-      const resp = await fetch(`/api/workers/${name}/reset`, { method: 'POST' })
+      const resp = await fetch(`/api/workers/${name}/reset`, {
+        method: 'POST',
+        headers: { 'x-admin-code': adminCode }
+      })
       if (resp.ok) {
         location.reload()
       } else {
@@ -102,7 +127,7 @@ export default function WorkerDetail({ name, onBack }) {
             <h1 className={styles.title}>Dossier: {soul.name || name}</h1>
           </div>
           <div className={styles.headerActions}>
-            <button className={styles.resetBtn} onClick={doReset}>RESET</button>
+            {adminVerified && <button className={styles.resetBtn} onClick={doReset}>RESET</button>}
             <button className={styles.backBtn} onClick={onBack}>&larr; BACK</button>
           </div>
         </header>
@@ -127,7 +152,7 @@ export default function WorkerDetail({ name, onBack }) {
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <h3 className={styles.sectionTitle}>BACKGROUND DOSSIER</h3>
-                {!editing && <button className={styles.btnSmall} onClick={startEdit}>EDIT</button>}
+                {!editing && adminVerified && <button className={styles.btnSmall} onClick={startEdit}>EDIT</button>}
               </div>
               {editing ? (
                 <div className={styles.editForm}>
@@ -166,6 +191,25 @@ export default function WorkerDetail({ name, onBack }) {
                 />
                 <button onClick={doWakeup} className={styles.btn}>WAKE</button>
               </div>
+            </div>
+
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>ADMIN ACCESS</h3>
+              {adminVerified ? (
+                <div className={styles.adminOk}>VERIFIED</div>
+              ) : (
+                <div className={styles.wakeupRow}>
+                  <input
+                    type="password"
+                    value={codeInput}
+                    onChange={e => setCodeInput(e.target.value)}
+                    placeholder="安全码..."
+                    className={styles.input}
+                    onKeyDown={e => e.key === 'Enter' && verifyCode()}
+                  />
+                  <button onClick={verifyCode} className={styles.btn}>VERIFY</button>
+                </div>
+              )}
               {msg && <div className={styles.msg}>{msg}</div>}
             </div>
           </aside>
