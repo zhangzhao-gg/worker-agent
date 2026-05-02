@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 依赖 better-sqlite3 直读 data/*.db, express 提供 HTTP
- * [OUTPUT]: REST API 供前端消费，/api/workers + /api/workers/:name/*
- * [POS]: dashboard 后端唯一入口，纯只读，不侵入 Worker Agent
+ * [INPUT]: 依赖 better-sqlite3 读写 data/*.db, express 提供 HTTP
+ * [OUTPUT]: REST API 供前端消费，读取数据 + 编辑人设 + 重置 + 手动唤醒
+ * [POS]: dashboard 后端唯一入口，直连 SQLite，不依赖 Worker 进程
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -13,7 +13,6 @@ import { join, resolve } from 'path'
 
 const DATA_DIR = resolve(process.env.DATA_DIR || '../data')
 const PORT = process.env.PORT || 3001
-const WORKER_API = process.env.WORKER_API || 'http://localhost:8080'
 
 const app = express()
 app.use(cors())
@@ -123,29 +122,45 @@ app.get('/api/workers/:name/reasoning', (req, res) => {
   res.json(rows)
 })
 
-// 代理写操作到 Worker API
-app.post('/api/workers/:name/wakeup', async (req, res) => {
+app.post('/api/workers/:name/wakeup', (req, res) => {
+  const dbPath = join(DATA_DIR, `${req.params.name}.db`)
+  if (!existsSync(dbPath)) return res.status(404).json({ error: 'not found' })
+  const reason = req.body.reason || '手动唤醒'
+  const datetime = new Date(Date.now() + 3000).toISOString()
   try {
-    const resp = await fetch(`${WORKER_API}/api/workers/${encodeURIComponent(req.params.name)}/wakeup`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    })
-    const data = await resp.json()
-    res.status(resp.status).json(data)
-  } catch (e) { res.status(502).json({ error: e.message }) }
+    if (conns.has(req.params.name)) {
+      conns.get(req.params.name).close()
+      conns.delete(req.params.name)
+    }
+    const wdb = new Database(dbPath)
+    wdb.prepare('INSERT INTO wakeup_schedule (datetime, reason) VALUES (?, ?)').run(datetime, reason)
+    wdb.close()
+    res.json({ status: 'wakeup_scheduled', reason })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
-app.put('/api/workers/:name', async (req, res) => {
+app.put('/api/workers/:name', (req, res) => {
+  const dbPath = join(DATA_DIR, `${req.params.name}.db`)
+  if (!existsSync(dbPath)) return res.status(404).json({ error: 'not found' })
+
+  const allowed = ['occupation', 'background', 'personality', 'speech_style', 'values_desc', 'family', 'avatar']
+  const updates = req.body
+  const fields = Object.keys(updates).filter(k => allowed.includes(k))
+  if (!fields.length) return res.status(400).json({ error: 'no valid fields' })
+
   try {
-    const resp = await fetch(`${WORKER_API}/api/workers/${encodeURIComponent(req.params.name)}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req.body)
-    })
-    const data = await resp.json()
-    res.status(resp.status).json(data)
-  } catch (e) { res.status(502).json({ error: e.message }) }
+    // 关闭只读连接
+    if (conns.has(req.params.name)) {
+      conns.get(req.params.name).close()
+      conns.delete(req.params.name)
+    }
+    const wdb = new Database(dbPath)
+    const stmt = fields.map(f => `${f} = ?`).join(', ')
+    const values = fields.map(f => updates[f])
+    wdb.prepare(`UPDATE soul SET ${stmt} WHERE id = 1`).run(...values)
+    wdb.close()
+    res.json({ status: 'updated' })
+  } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
 app.post('/api/workers/:name/reset', (req, res) => {
@@ -170,10 +185,6 @@ app.post('/api/workers/:name/reset', (req, res) => {
     wdb.close()
     res.json({ status: 'reset' })
   } catch (e) { res.status(500).json({ error: e.message }) }
-})
-
-app.get('/api/config', (req, res) => {
-  res.json({ workerAPI: WORKER_API })
 })
 
 app.listen(PORT, () => {
