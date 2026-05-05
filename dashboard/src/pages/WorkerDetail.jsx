@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './WorkerDetail.module.css'
 
 const TABS = ['narrative', 'memory', 'event', 'schedule', 'wakeup', 'reasoning']
-const TAB_LABELS = { narrative: '对外叙事', memory: '私人记忆', event: '城市事件', schedule: '心跳计划', wakeup: '唤醒计划', reasoning: '推理日志' }
+const TAB_LABELS = { narrative: '日记', memory: '内心OS', event: '见闻', schedule: '日程', wakeup: '思考计划', reasoning: '思维链' }
 
 export default function WorkerDetail({ name, onBack }) {
   const [tab, setTab] = useState('narrative')
@@ -14,6 +14,7 @@ export default function WorkerDetail({ name, onBack }) {
   const [adminCode, setAdminCode] = useState('')
   const [adminVerified, setAdminVerified] = useState(false)
   const [codeInput, setCodeInput] = useState('')
+  const [showDetail, setShowDetail] = useState(false)
 
   useEffect(() => {
     fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker).catch(() => {})
@@ -22,6 +23,42 @@ export default function WorkerDetail({ name, onBack }) {
     }, 15000)
     return () => clearInterval(timer)
   }, [name])
+
+  if (!worker) return <div className={styles.loading}>Loading...</div>
+
+  if (!showDetail) {
+    return (
+      <VisitorView
+        name={name}
+        worker={worker}
+        onBack={onBack}
+        onShowDetail={() => setShowDetail(true)}
+        codeInput={codeInput}
+        setCodeInput={setCodeInput}
+        onVerify={async () => {
+          try {
+            const resp = await fetch('/api/auth/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: codeInput })
+            })
+            const data = await resp.json()
+            if (data.ok) {
+              setAdminCode(codeInput)
+              setAdminVerified(true)
+              setShowDetail(true)
+              setMsg('验证通过')
+            } else {
+              setMsg('验证码错误')
+            }
+          } catch { setMsg('验证失败') }
+          setTimeout(() => setMsg(''), 3000)
+        }}
+        msg={msg}
+        setMsg={setMsg}
+      />
+    )
+  }
 
   async function verifyCode() {
     try {
@@ -107,8 +144,6 @@ export default function WorkerDetail({ name, onBack }) {
     }
   }
 
-  if (!worker) return <div className={styles.loading}>Loading...</div>
-
   const soul = worker.soul || {}
 
   return (
@@ -137,6 +172,7 @@ export default function WorkerDetail({ name, onBack }) {
             />
             <button onClick={doWakeup} className={styles.backBtn}>唤醒</button>
             {adminVerified && <button className={styles.resetBtn} onClick={doReset}>重置</button>}
+            <button className={styles.backBtn} onClick={() => setShowDetail(false)}>简要视图</button>
             <button className={styles.backBtn} onClick={onBack}>&larr; 返回</button>
           </div>
         </header>
@@ -225,6 +261,384 @@ export default function WorkerDetail({ name, onBack }) {
           </div>
         </div>
       </main>
+    </div>
+  )
+}
+
+// ================================================================
+//  访客视图 — 一屏角色状态卡
+// ================================================================
+
+function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInput, onVerify, msg, setMsg }) {
+  const soul = worker.soul || {}
+  const [heartbeats, setHeartbeats] = useState([])
+  const [narratives, setNarratives] = useState([])
+  const [events, setEvents] = useState([])
+  const [wakeups, setWakeups] = useState([])
+  const [wakeupReason, setWakeupReason] = useState('')
+  const [wakeupMsg, setWakeupMsg] = useState('')
+  const [showLockModal, setShowLockModal] = useState(false)
+
+  const [tick, setTick] = useState(Date.now())
+
+  useEffect(() => {
+    const load = () => {
+      fetch(`/api/workers/${name}/heartbeats`).then(r => r.json()).then(setHeartbeats).catch(() => {})
+      fetch(`/api/workers/${name}/narratives`).then(r => r.json()).then(setNarratives).catch(() => {})
+      fetch(`/api/workers/${name}/events`).then(r => r.json()).then(setEvents).catch(() => {})
+      fetch(`/api/workers/${name}/wakeups`).then(r => r.json()).then(setWakeups).catch(() => {})
+      setTick(Date.now())
+    }
+    load()
+    const timer = setInterval(load, 15000)
+    return () => clearInterval(timer)
+  }, [name])
+
+  // ------ 计算当前状态 ------
+  const now = tick
+  const twentyMinAgo = now - 20 * 60 * 1000
+
+  const currentActivity = useMemo(() => {
+    const recent = heartbeats.find(h => {
+      const t = new Date(h.date + 'T' + h.time).getTime()
+      return t >= twentyMinAgo && t <= now
+    })
+    return recent ? recent.task : null
+  }, [heartbeats, tick])
+
+  const nextPlan = useMemo(() => {
+    const future = heartbeats.filter(h => {
+      const t = new Date(h.date + 'T' + h.time).getTime()
+      return t > now
+    }).sort((a, b) => {
+      const ta = new Date(a.date + 'T' + a.time).getTime()
+      const tb = new Date(b.date + 'T' + b.time).getTime()
+      return ta - tb
+    })
+    if (!future.length) return null
+    const next = future[0]
+    const nextTime = new Date(next.date + 'T' + next.time).getTime()
+    const diffMin = Math.round((nextTime - now) / 60000)
+    if (diffMin > 180) {
+      // 超过3小时，找明天最早的
+      const earliest = future[0]
+      return { type: 'rest', time: earliest.time, task: earliest.task }
+    }
+    return { type: 'upcoming', minutes: diffMin, task: next.task }
+  }, [heartbeats, tick])
+
+  const nextWakeup = useMemo(() => {
+    const pending = wakeups.filter(w => w.status === 'pending')
+    if (!pending.length) return null
+    pending.sort((a, b) => new Date(a.datetime) - new Date(b.datetime))
+    const future = pending.find(w => new Date(w.datetime) > new Date())
+    return future || pending[0]
+  }, [wakeups])
+
+  // ------ 状态动画类型 ------
+  const statusType = useMemo(() => {
+    if (worker.status === 'thinking' || worker.status === 'reasoning') return 'thinking'
+    if (currentActivity) return 'active'
+    return 'resting'
+  }, [worker.status, currentActivity])
+
+  const [isThinking, setIsThinking] = useState(false)
+  const [thinkingStarted, setThinkingStarted] = useState(false)
+  const [thinkingSteps, setThinkingSteps] = useState([])
+  const [thinkingResult, setThinkingResult] = useState(null)
+  const [manualWakeup, setManualWakeup] = useState(false)
+  const baselineIdRef = useRef(0)
+  const [detailModal, setDetailModal] = useState(null)
+
+  const TOOL_LABELS = {
+    get_city_temperature: '正在感知天气...',
+    get_food_status: '正在了解食物供应...',
+    get_city_announcements: '正在查看公告...',
+    get_my_work_assignment: '正在确认工作安排...',
+    get_recent_events: '正在回忆最近发生的事...',
+    get_memories: '正在回忆过去的想法...',
+    write_heartbeat_schedule: '正在安排今天的日程...',
+    update_heartbeat_schedule: '正在调整日程...',
+    schedule_wakeup: '正在安排下次思考时间...',
+    write_narrative: '正在写日记...',
+    write_memory: '正在记录内心想法...',
+    update_soul: '正在调整情绪状态...',
+    cancel_wakeup: '正在取消计划...',
+    TodoWrite: '正在整理思路...',
+  }
+
+  function extractToolName(content) {
+    if (!content) return null
+    const m = content.match(/"name"\s*:\s*"([^"]+)"/) || content.match(/^(\w+)\(/)
+    return m ? m[1] : null
+  }
+
+  // 持续轮询 reasoning，自动检测是否在思考
+  useEffect(() => {
+    const poll = setInterval(() => {
+      fetch(`/api/workers/${name}/reasoning?limit=100`)
+        .then(r => r.json())
+        .then(rows => {
+          if (!rows.length) return
+          const sorted = rows.sort((a, b) => a.id - b.id)
+
+          let targetLogs
+          if (manualWakeup) {
+            targetLogs = sorted.filter(r => r.id > baselineIdRef.current)
+            if (!targetLogs.length) return
+          } else {
+            const lastLog = sorted[sorted.length - 1]
+            targetLogs = sorted.filter(r => r.session_id === lastLog.session_id)
+          }
+
+          if (!targetLogs.length) return
+          const lastEntry = targetLogs[targetLogs.length - 1]
+          const finished = lastEntry.type === 'finish'
+
+          if (!finished) {
+            setIsThinking(true)
+            setThinkingStarted(true)
+            // 提取人话步骤
+            const steps = []
+            for (const log of targetLogs) {
+              if (log.type === 'tool_call') {
+                const toolName = extractToolName(log.content)
+                const label = TOOL_LABELS[toolName] || `正在执行 ${toolName}...`
+                if (!steps.length || steps[steps.length - 1] !== label) steps.push(label)
+              }
+            }
+            if (!steps.length) steps.push('正在思考...')
+            setThinkingSteps(steps.slice(-3))
+            setThinkingResult(null)
+          } else {
+            // 思考完成 — 提取结果
+            if (isThinking || manualWakeup) {
+              const result = { narrative: null, memory: null, moodChange: null, nextWakeup: null }
+              for (const log of targetLogs) {
+                if (log.type === 'tool_call') {
+                  const toolName = extractToolName(log.content)
+                  if (toolName === 'write_narrative') {
+                    const m = log.content.match(/"text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/)
+                    if (m) result.narrative = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
+                  }
+                  if (toolName === 'write_memory') {
+                    const m = log.content.match(/"text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/)
+                    if (m) result.memory = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
+                  }
+                  if (toolName === 'update_soul') result.moodChange = true
+                  if (toolName === 'schedule_wakeup') {
+                    const m = log.content.match(/"reason"\s*:\s*"([^"]*)"/)
+                    if (m) result.nextWakeup = m[1]
+                  }
+                }
+              }
+              setThinkingResult(result)
+              setIsThinking(false)
+              setManualWakeup(false)
+              // 刷新主数据
+              fetch(`/api/workers/${name}/narratives`).then(r => r.json()).then(setNarratives).catch(() => {})
+              fetch(`/api/workers/${name}/wakeups`).then(r => r.json()).then(setWakeups).catch(() => {})
+            }
+          }
+        })
+        .catch(() => {})
+    }, 2000)
+    return () => clearInterval(poll)
+  }, [name, manualWakeup, isThinking])
+
+  async function doVisitorWakeup() {
+    const reason = wakeupReason || '访客唤醒'
+    try {
+      const rows = await fetch(`/api/workers/${name}/reasoning?limit=1`).then(r => r.json())
+      baselineIdRef.current = rows.length ? Math.max(...rows.map(r => r.id)) : 0
+
+      await fetch(`/api/workers/${name}/wakeup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      setWakeupReason('')
+      setManualWakeup(true)
+      setIsThinking(true)
+      setThinkingStarted(false)
+      setThinkingSteps([])
+      setThinkingResult(null)
+    } catch (e) { setWakeupMsg('失败: ' + e.message); setTimeout(() => setWakeupMsg(''), 3000) }
+  }
+
+  return (
+    <div className={styles.visitorContainer}>
+      {/* 隐蔽管理员入口 */}
+      <button className={styles.lockIcon} onClick={() => setShowLockModal(true)} title="管理员">
+        &#x1f512;
+      </button>
+
+      {/* 密码浮层 */}
+      {showLockModal && (
+        <div className={styles.lockOverlay} onClick={() => setShowLockModal(false)}>
+          <div className={styles.lockModal} onClick={e => e.stopPropagation()}>
+            <div className={styles.lockModalTitle}>ADMIN VERIFY</div>
+            <div className={styles.wakeupRow}>
+              <input
+                type="password"
+                value={codeInput}
+                onChange={e => setCodeInput(e.target.value)}
+                placeholder="安全码..."
+                className={styles.input}
+                onKeyDown={e => e.key === 'Enter' && onVerify()}
+                autoFocus
+              />
+              <button onClick={onVerify} className={styles.btn}>VERIFY</button>
+            </div>
+            {msg && <div className={styles.msg}>{msg}</div>}
+          </div>
+        </div>
+      )}
+
+      {/* 返回按钮 */}
+      <button className={styles.visitorBack} onClick={onBack}>&larr; 返回</button>
+
+      {/* 主卡片 */}
+      <div className={styles.visitorCard}>
+        {/* 头像 + 身份 */}
+        <div className={styles.visitorIdentity}>
+          <div className={styles.visitorAvatar}>
+            {soul.avatar ? <img src={soul.avatar} className={styles.avatarImg} /> : (soul.name || name)[0]?.toUpperCase()}
+          </div>
+          <h1 className={styles.visitorName}>{soul.name || name}</h1>
+          <div className={styles.visitorOccupation}>{soul.occupation}</div>
+        </div>
+
+        {/* 当前状态行 */}
+        <div className={styles.visitorStatus}>
+          <span className={`${styles.statusDot} ${styles[`dot_${statusType}`]}`} />
+          <span className={styles.statusText}>
+            {currentActivity ? currentActivity : '休息中'}
+          </span>
+          {statusType === 'active' && <span className={styles.ellipsis} />}
+        </div>
+
+        {/* 下一步计划 */}
+        {nextPlan && (
+          <div className={styles.visitorNext}>
+            {nextPlan.type === 'upcoming'
+              ? `${nextPlan.minutes} 分钟后要去 ${nextPlan.task}`
+              : `休息中，明日 ${nextPlan.time} 起床`
+            }
+          </div>
+        )}
+
+        {/* 信息卡片区 */}
+        <div className={styles.visitorInfoGrid}>
+          {/* 最近日记 */}
+          <div className={styles.visitorInfoItem} onClick={() => narratives.length && setDetailModal({ title: '最近日记', content: narratives[0].content })}>
+            <div className={styles.visitorInfoLabel}>最近日记</div>
+            <div className={styles.visitorInfoContent}>
+              {narratives.length ? narratives[0].content : '暂无日记'}
+            </div>
+            {narratives.length > 0 && <span className={styles.expandHint}>点击展开</span>}
+          </div>
+
+          {/* 最近见闻 */}
+          <div className={styles.visitorInfoItem} onClick={() => events.length && setDetailModal({ title: '最近见闻', content: events[0].content })}>
+            <div className={styles.visitorInfoLabel}>最近见闻</div>
+            <div className={styles.visitorInfoContent}>
+              {events.length ? events[0].content : '暂无见闻'}
+            </div>
+            {events.length > 0 && <span className={styles.expandHint}>点击展开</span>}
+          </div>
+        </div>
+
+        {/* 详情模态框 */}
+        {detailModal && (
+          <div className={styles.lockOverlay} onClick={() => setDetailModal(null)}>
+            <div className={styles.detailModal} onClick={e => e.stopPropagation()}>
+              <div className={styles.lockModalTitle}>{detailModal.title}</div>
+              <div className={styles.detailContent}>{detailModal.content}</div>
+              <button className={styles.btn} onClick={() => setDetailModal(null)}>关闭</button>
+            </div>
+          </div>
+        )}
+
+        {/* 下次思考计划 */}
+        {nextWakeup && (
+          <div className={styles.visitorWakeupInfo}>
+            <span className={styles.visitorInfoLabel}>下次思考</span>
+            <span>{fmtTime(nextWakeup.datetime)} - {nextWakeup.reason}</span>
+          </div>
+        )}
+
+        {/* 情绪旁白 */}
+        <div className={styles.visitorMoodNarrative}>
+          {moodNarrative(soul)}
+        </div>
+
+        {/* 了解更多 */}
+        <button className={styles.visitorMoreBtn} onClick={onShowDetail}>
+          了解更多关于 {soul.name || name} 的信息 &rarr;
+        </button>
+
+        {/* 唤醒输入 */}
+        <div className={styles.visitorWakeupAction}>
+          <input
+            value={wakeupReason}
+            onChange={e => setWakeupReason(e.target.value)}
+            placeholder="说点什么唤醒 TA..."
+            className={styles.visitorWakeupInput}
+            onKeyDown={e => e.key === 'Enter' && doVisitorWakeup()}
+            disabled={isThinking}
+          />
+          <button onClick={doVisitorWakeup} className={styles.btn} disabled={isThinking}>
+            {isThinking ? '思考中' : '唤醒'}
+          </button>
+        </div>
+        {wakeupMsg && <div className={styles.msg}>{wakeupMsg}</div>}
+
+        {/* 思考面板 */}
+        {(isThinking || thinkingResult) && (
+          <div className={styles.thinkingPanel}>
+            {isThinking ? (
+              <>
+                <div className={styles.thinkingHeader}>
+                  <span className={`${styles.statusDot} ${styles.dot_thinking}`} />
+                  <span>{thinkingStarted ? '正在思考' : '等待唤醒...'}</span>
+                </div>
+                <div className={styles.thinkingSteps}>
+                  {thinkingSteps.map((step, i) => (
+                    <div key={i} className={`${styles.thinkingStep} ${i === thinkingSteps.length - 1 ? styles.stepActive : styles.stepDone}`}>
+                      {step}
+                    </div>
+                  ))}
+                  <div className={styles.thinkingCursor} />
+                </div>
+              </>
+            ) : thinkingResult && (
+              <>
+                <div className={styles.thinkingHeader}>
+                  <span className={styles.statusDot} style={{ background: '#22c55e' }} />
+                  <span>思考完成</span>
+                </div>
+                <div className={styles.thinkingResultBody}>
+                  {thinkingResult.narrative && (
+                    <div className={styles.resultItem}>
+                      <span className={styles.resultLabel}>写了日记</span>
+                      <p className={styles.resultText}>{thinkingResult.narrative}</p>
+                    </div>
+                  )}
+                  {thinkingResult.memory && (
+                    <div className={styles.resultItem}>
+                      <span className={styles.resultLabel}>内心想法</span>
+                      <p className={styles.resultText}>{thinkingResult.memory}</p>
+                    </div>
+                  )}
+                  {thinkingResult.moodChange && <div className={styles.resultMeta}>情绪有所变化</div>}
+                  {thinkingResult.nextWakeup && <div className={styles.resultMeta}>安排了下次思考：{thinkingResult.nextWakeup}</div>}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -480,13 +894,21 @@ function Pagination({ page, totalPages, onChange }) {
   )
 }
 
-function Meter({ label, value }) {
+function Meter({ label, value, color }) {
   return (
     <div className={styles.meter}>
       <div className={styles.meterLabel}><span>{label}</span><span>{value}</span></div>
-      <div className={styles.meterBar}><div className={styles.meterFill} style={{ width: `${Math.min(100, Math.max(0, value))}%` }} /></div>
+      <div className={styles.meterBar}><div className={styles.meterFill} style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: color || 'var(--accent)' }} /></div>
     </div>
   )
+}
+
+function moodNarrative(soul) {
+  const pick = (v, opts) => { const n = Math.min(100, Math.max(0, v || 0)); return opts[n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : n <= 80 ? 3 : 4] }
+  const mood = pick(soul.mood, ['心情很差', '有些低落', '心情平平', '心情还不错', '心情很好'])
+  const hope = pick(soul.hope, ['对未来感到绝望', '有些迷茫', '对未来没什么想法', '对未来有所期待', '对未来充满希望'])
+  const griev = pick(soul.grievance, ['', '，偶尔会有点不满', '，对现状有些不满', '，对现状相当愤怒', '，对现状极度愤怒'])
+  return `现在${mood}，${hope}${griev}。`
 }
 
 function Field({ label, value }) {

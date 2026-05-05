@@ -52,7 +52,7 @@
 .meter { display: flex; flex-direction: column; gap: 0.15rem; }
 .meterLabel { display: flex; justify-content: space-between; font-family: var(--font); font-size: 0.7rem; color: var(--muted); }
 .meterBar { height: 12px; border: 1px solid var(--border); position: relative; background: var(--surface-alt); }
-.meterFill { position: absolute; top: 0; left: 0; height: 100%; background: var(--accent); opacity: 0.4; }
+.meterFill { position: absolute; top: 0; left: 0; height: 100%; background: var(--accent); opacity: 0.5; }
 
 /* Fields */
 .field { margin-bottom: 0.4rem; }
@@ -141,3 +141,404 @@
 .badge_tool_call { border-color: #fbbf24; color: #fbbf24; }
 .badge_tool_result { border-color: #4ade80; color: #4ade80; }
 .badge_finish { border-color: #ef4444; color: #ef4444; }
+
+/* ================================================================
+   访客视图 — 一屏角色状态卡
+   ================================================================ */
+
+.visitorContainer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  position: relative;
+  padding: 2rem;
+}
+
+.visitorBack {
+  position: absolute;
+  top: 1.5rem;
+  left: 2rem;
+  font-family: var(--font);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  background: transparent;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.visitorBack:hover { background: rgba(139,94,60,0.08); }
+
+/* 隐蔽锁图标 */
+.lockIcon {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  opacity: 0.15;
+  transition: opacity 0.3s;
+  filter: grayscale(1);
+  padding: 0.3rem;
+}
+.lockIcon:hover { opacity: 0.5; }
+
+/* 密码浮层 */
+.lockOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(26,20,16,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease;
+}
+.lockModal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 1.5rem 2rem;
+  box-shadow: 0 8px 32px rgba(26,20,16,0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  min-width: 280px;
+}
+.lockModalTitle {
+  font-family: var(--font);
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: center;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* 主卡片 */
+.visitorCard {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  background: #d4c4a8;
+  background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 100% 1.6rem;
+  box-shadow: 0 4px 24px rgba(26,20,16,0.15), inset 0 0 20px rgba(0,0,0,0.06);
+  padding: 2.5rem 2rem;
+  filter: url(#paper-edge);
+  animation: revealIn 0.6s ease both;
+}
+
+/* 身份区 */
+.visitorIdentity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+.visitorAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1px solid rgba(42,31,24,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-size: 2rem;
+  color: var(--accent);
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 0.3rem;
+}
+.visitorName {
+  font-family: var(--font);
+  font-size: 1.4rem;
+  font-weight: normal;
+  letter-spacing: 0.05em;
+  color: #1a1208;
+  text-shadow: 0 0 0.5px #1a1208;
+}
+.visitorOccupation {
+  font-family: var(--font);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(42,31,24,0.6);
+}
+
+/* 状态行 */
+.visitorStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px dashed rgba(42,31,24,0.15);
+  background: rgba(255,255,255,0.3);
+}
+
+/* 脉冲圆点 */
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot_active {
+  background: #22c55e;
+  animation: pulseGreen 2s ease-in-out infinite;
+}
+.dot_resting {
+  background: rgba(42,31,24,0.3);
+  animation: pulseRest 4s ease-in-out infinite;
+}
+.dot_thinking {
+  background: #f59e0b;
+  animation: pulseOrange 0.8s ease-in-out infinite;
+}
+@keyframes pulseGreen {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,197,94,0.4); }
+  50% { opacity: 0.6; box-shadow: 0 0 8px 2px rgba(34,197,94,0.2); }
+}
+@keyframes pulseRest {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.2; }
+}
+@keyframes pulseOrange {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+  50% { opacity: 0.5; box-shadow: 0 0 6px 2px rgba(245,158,11,0.3); }
+}
+
+.statusText {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: #1a1208;
+}
+
+/* 省略号动画 */
+.ellipsis::after {
+  content: '';
+  animation: dots 1.5s steps(4, end) infinite;
+}
+@keyframes dots {
+  0% { content: ''; }
+  25% { content: '.'; }
+  50% { content: '..'; }
+  75% { content: '...'; }
+}
+
+/* 下一步计划 */
+.visitorNext {
+  font-family: var(--font);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: rgba(42,31,24,0.6);
+  text-align: center;
+  padding: 0.3rem 0;
+}
+
+/* 信息网格 */
+.visitorInfoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.visitorInfoItem {
+  border-left: 2px solid rgba(42,31,24,0.2);
+  padding-left: 0.8rem;
+}
+.visitorInfoLabel {
+  font-family: var(--font);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(42,31,24,0.5);
+  margin-bottom: 0.25rem;
+}
+.visitorInfoContent {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1a1208;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 下次思考计划 */
+.visitorWakeupInfo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.6rem;
+  font-family: var(--font);
+  font-size: 0.85rem;
+  color: rgba(42,31,24,0.6);
+  padding: 0.5rem 0;
+  border-top: 1px dashed rgba(42,31,24,0.12);
+}
+
+/* 情绪条（管理员视图保留） */
+.visitorMeters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+}
+
+/* 情绪旁白（访客视图） */
+.visitorMoodNarrative {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: rgba(42,31,24,0.55);
+  text-align: center;
+  font-style: italic;
+  padding: 0.4rem 0;
+}
+
+/* 了解更多 */
+.visitorMoreBtn {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  background: transparent;
+  border: 1px dashed rgba(139,94,60,0.35);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 0.3rem;
+}
+.visitorMoreBtn:hover {
+  background: rgba(139,94,60,0.06);
+  border-color: var(--accent);
+}
+
+/* 唤醒输入 */
+.visitorWakeupAction {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(42,31,24,0.12);
+}
+.visitorWakeupInput {
+  flex: 1;
+  border: 1px solid rgba(42,31,24,0.2);
+  background: rgba(255,255,255,0.4);
+  color: #1a1208;
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font);
+  font-size: 0.8rem;
+  outline: none;
+}
+.visitorWakeupInput:focus {
+  border-color: var(--accent);
+  background: rgba(255,255,255,0.6);
+}
+.visitorWakeupInput::placeholder { color: rgba(42,31,24,0.35); }
+
+/* 思考面板 */
+.thinkingPanel {
+  border: 1px solid rgba(42,31,24,0.15);
+  background: rgba(255,255,255,0.25);
+  animation: fadeIn 0.3s ease;
+}
+.thinkingHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px dashed rgba(42,31,24,0.1);
+  font-family: var(--font);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  color: rgba(42,31,24,0.7);
+}
+.thinkingSteps {
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.thinkingStep {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: rgba(42,31,24,0.4);
+  animation: fadeIn 0.3s ease;
+}
+.stepActive {
+  color: rgba(42,31,24,0.8);
+  animation: stepPulse 1.5s ease-in-out infinite;
+}
+.stepDone { color: rgba(42,31,24,0.35); }
+@keyframes stepPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.thinkingCursor {
+  width: 6px;
+  height: 14px;
+  background: var(--accent);
+  animation: blink 1s step-end infinite;
+  margin-top: 0.2rem;
+}
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* 思考结果 */
+.thinkingResultBody {
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.resultItem { border-left: 2px solid rgba(42,31,24,0.15); padding-left: 0.6rem; }
+.resultLabel { font-family: var(--font); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,31,24,0.5); display: block; margin-bottom: 0.15rem; }
+.resultText { font-family: var(--font-body); font-size: 0.82rem; line-height: 1.6; color: #1a1208; }
+.resultMeta { font-family: var(--font-body); font-size: 0.75rem; color: rgba(42,31,24,0.5); font-style: italic; }
+
+/* 详情模态框 — 黄皮纸 + 油墨 + 撕裂边缘 */
+.detailModal {
+  background: #d4c4a8;
+  background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px);
+  background-size: 100% 1.6rem;
+  box-shadow: 0 4px 24px rgba(26,20,16,0.25), inset 0 0 20px rgba(0,0,0,0.06);
+  padding: 2rem 2rem 1.5rem;
+  max-width: 500px;
+  width: 90%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  filter: url(#paper-edge);
+}
+.detailContent {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #1a1208;
+  text-shadow: 0 0 0.5px #1a1208, 0.3px 0.3px 0.5px rgba(26,18,8,0.4);
+  -webkit-font-smoothing: antialiased;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+/* 点击展开提示 */
+.expandHint {
+  font-family: var(--font);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  color: rgba(42,31,24,0.3);
+  text-transform: uppercase;
+  margin-top: 0.2rem;
+}
+.visitorInfoItem { cursor: pointer; transition: background 0.15s; padding: 0.4rem 0 0.4rem 0.8rem; }
+.visitorInfoItem:hover { background: rgba(255,255,255,0.2); }

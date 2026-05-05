@@ -37,7 +37,7 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 	defer wg.Done()
 	log.Println("[唤醒] 协程启动")
 
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
