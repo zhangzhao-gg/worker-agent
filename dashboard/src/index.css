@@ -1,24 +1,31 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --ink: #1f1b16;
-  --accent: #8b7355;
-  --surface: #f0ebe0;
-  --surface-alt: #f4f1ea;
-  --border: #8b7355;
-  --border-light: #d1c4b9;
-  --muted: #4d453c;
-  --font: 'Newsreader', serif;
+  --ink: #d4c4a8;
+  --accent: #f4a462;
+  --surface: #0a0a0f;
+  --surface-alt: #1a1410;
+  --border: rgba(244, 164, 98, 0.25);
+  --border-light: rgba(244, 164, 98, 0.12);
+  --muted: rgba(212, 196, 168, 0.5);
+  --font: Menlo, Consolas, 'Courier New', monospace;
+  --font-body: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
 body {
-  font-family: var(--font);
+  font-family: var(--font-body);
   color: var(--ink);
   background: var(--surface);
   min-height: 100vh;
   line-height: 1.6;
-  font-size: 16px;
+  font-size: 14px;
+  text-shadow: 0.5px 0.5px 1px rgba(0,0,0,0.8), 0 0 2px rgba(244,164,98,0.05);
 }
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { opacity: 0.8; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(244,164,98,0.2); border-radius: 2px; }

@@ -11,6 +11,15 @@ export default function App() {
     return () => window.removeEventListener('popstate', onPop)
   }, [])
 
+  // 首页自动跳转到第一个工人
+  useEffect(() => {
+    if (!route.worker) {
+      fetch('/api/workers').then(r => r.json()).then(workers => {
+        if (workers.length) navigate(`/worker/${workers[0].name}`)
+      }).catch(() => {})
+    }
+  }, [])
+
   function navigate(path) {
     history.pushState(null, '', path)
     setRoute(parseRoute(path))

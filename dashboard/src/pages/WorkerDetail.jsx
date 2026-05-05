@@ -113,7 +113,7 @@ export default function WorkerDetail({ name, onBack }) {
   return (
     <div className={styles.container}>
       <nav className={styles.nav}>
-        <div className={styles.logo}>工人档案</div>
+        <div className={styles.logo}>WORKER ARCHIVE</div>
         <div className={styles.navLinks}>
           <a onClick={onBack}>CATALOGUE</a>
           <span className={styles.navActive}>ENTRIES</span>
@@ -127,6 +127,14 @@ export default function WorkerDetail({ name, onBack }) {
             <h1 className={styles.title}>Dossier: {soul.name || name}</h1>
           </div>
           <div className={styles.headerActions}>
+            <input
+              value={wakeupReason}
+              onChange={e => setWakeupReason(e.target.value)}
+              placeholder="唤醒原因..."
+              className={styles.headerInput}
+              onKeyDown={e => e.key === 'Enter' && doWakeup()}
+            />
+            <button onClick={doWakeup} className={styles.backBtn}>唤醒</button>
             {adminVerified && <button className={styles.resetBtn} onClick={doReset}>重置</button>}
             <button className={styles.backBtn} onClick={onBack}>&larr; 返回</button>
           </div>
@@ -179,19 +187,6 @@ export default function WorkerDetail({ name, onBack }) {
               )}
             </div>
 
-            <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>手动唤醒</h3>
-              <div className={styles.wakeupRow}>
-                <input
-                  value={wakeupReason}
-                  onChange={e => setWakeupReason(e.target.value)}
-                  placeholder="唤醒原因..."
-                  className={styles.input}
-                  onKeyDown={e => e.key === 'Enter' && doWakeup()}
-                />
-                <button onClick={doWakeup} className={styles.btn}>WAKE</button>
-              </div>
-            </div>
 
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>管理员验证</h3>
@@ -263,15 +258,21 @@ function MemoryTab({ name }) {
   }
 
   return (
-    <div className={styles.logList}>
-      {data.map(item => (
-        <article key={item.id} className={styles.logItem} onClick={() => toggle(item.id)}>
-          <div className={styles.logMeta}>
-            <span>{fmtTime(item.timestamp)}</span>
-          </div>
-          <p className={`${styles.logContent} ${revealed.has(item.id) ? '' : styles.blurred}`}>{item.content}</p>
-        </article>
-      ))}
+    <div className={styles.parchmentWrap}>
+      <div className={styles.mechBar}>
+        <div className={styles.mechLine} />
+        <span className={styles.mechLabel}>MEMORY</span>
+      </div>
+      <div className={styles.logList}>
+        {data.map(item => (
+          <article key={item.id} className={styles.logItem} onClick={() => toggle(item.id)}>
+            <div className={styles.logMeta}>
+              <span>{fmtTime(item.timestamp)}</span>
+            </div>
+            <p className={`${styles.logContent} ${revealed.has(item.id) ? '' : styles.blurred}`}>{item.content}</p>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }
@@ -293,21 +294,27 @@ function GenericTab({ name, tab }) {
   if (tab === 'wakeup') return <WakeupTable data={data} />
 
   return (
-    <div className={styles.logList}>
-      {data.map(item => (
-        <article key={item.id} className={styles.logItem}>
-          <div className={styles.logMeta}>
-            <span>{fmtTime(item.timestamp || item.datetime)}</span>
-            {item.type && <span className={styles.badge}>{item.type}</span>}
-            {item.processed !== undefined && (
-              <span className={item.processed ? styles.badgeDone : styles.badgeWarn}>
-                {item.processed ? '已处理' : '未处理'}
-              </span>
-            )}
-          </div>
-          <p className={styles.logContent}>{item.content}</p>
-        </article>
-      ))}
+    <div className={styles.parchmentWrap}>
+      <div className={styles.mechBar}>
+        <div className={styles.mechLine} />
+        <span className={styles.mechLabel}>{TAB_LABELS[tab]}</span>
+      </div>
+      <div className={styles.logList}>
+        {data.map(item => (
+          <article key={item.id} className={styles.logItem}>
+            <div className={styles.logMeta}>
+              <span>{fmtTime(item.timestamp || item.datetime)}</span>
+              {item.type && <span className={styles.badge}>{item.type}</span>}
+              {item.processed !== undefined && (
+                <span className={item.processed ? styles.badgeDone : styles.badgeWarn}>
+                  {item.processed ? '已处理' : '未处理'}
+                </span>
+              )}
+            </div>
+            <p className={styles.logContent}>{item.content}</p>
+          </article>
+        ))}
+      </div>
     </div>
   )
 }
@@ -422,7 +429,11 @@ function ScheduleTable({ data }) {
   const slice = data.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
-    <div>
+    <div className={styles.parchmentWrap}>
+      <div className={styles.mechBar}>
+        <div className={styles.mechLine} />
+        <span className={styles.mechLabel}>心跳计划</span>
+      </div>
       <table className={styles.table}>
         <thead><tr><th>日期</th><th>时间</th><th>任务</th><th>状态</th></tr></thead>
         <tbody>
@@ -448,7 +459,11 @@ function WakeupTable({ data }) {
   const slice = data.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   return (
-    <div>
+    <div className={styles.parchmentWrap}>
+      <div className={styles.mechBar}>
+        <div className={styles.mechLine} />
+        <span className={styles.mechLabel}>唤醒计划</span>
+      </div>
       <table className={styles.table}>
         <thead><tr><th>时间</th><th>原因</th><th>状态</th></tr></thead>
         <tbody>

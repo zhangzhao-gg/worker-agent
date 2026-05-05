@@ -1,21 +1,21 @@
-.container { min-height: 100vh; display: flex; flex-direction: column; }
+.container { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface); }
 .nav { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 3rem; border-bottom: 1px solid var(--border); background: var(--surface-alt); }
-.logo { font-size: 1.5rem; font-weight: 900; letter-spacing: -0.02em; color: var(--accent); text-transform: uppercase; }
-.label { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; }
+.logo { font-family: var(--font); font-size: 1.2rem; font-weight: bold; letter-spacing: 0.15em; color: var(--accent); text-transform: uppercase; opacity: 0.9; }
+.label { font-family: var(--font); font-size: 0.65rem; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
 .main { flex: 1; padding: 3rem; max-width: 1200px; margin: 0 auto; width: 100%; }
-.title { font-size: 2.5rem; font-weight: 600; margin-bottom: 2rem; letter-spacing: -0.02em; }
+.title { font-family: var(--font); font-size: 1.4rem; font-weight: normal; margin-bottom: 2rem; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem; }
-.card { border: 1px solid var(--border); padding: 1.5rem; cursor: pointer; transition: background 0.15s; display: flex; gap: 1rem; align-items: flex-start; }
-.card:hover { background: var(--surface-alt); }
-.avatar { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; color: var(--accent); flex-shrink: 0; }
+.card { border: 1px solid var(--border); padding: 1.5rem; cursor: pointer; transition: all 0.15s; display: flex; gap: 1rem; align-items: flex-start; background: var(--surface-alt); box-shadow: 0 0 8px rgba(244,164,98,0.03); }
+.card:hover { border-color: var(--accent); box-shadow: 0 0 16px rgba(244,164,98,0.08); }
+.avatar { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 1.2rem; color: var(--accent); flex-shrink: 0; }
 .info { flex: 1; min-width: 0; }
-.name { font-size: 1.1rem; font-weight: 500; }
-.occupation { font-size: 0.85rem; color: var(--muted); margin-top: 0.2rem; }
-.status { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.4rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border); display: inline-block; }
-.status[data-status="running"] { border-color: #22c55e; color: #16a34a; }
+.name { font-size: 1rem; font-weight: 500; color: var(--ink); }
+.occupation { font-family: var(--font); font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; letter-spacing: 0.05em; text-transform: uppercase; }
+.status { font-family: var(--font); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 0.4rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border); display: inline-block; color: var(--muted); }
+.status[data-status="running"] { border-color: rgba(34,197,94,0.5); color: #4ade80; }
 .status[data-status="stopped"] { border-color: var(--border-light); color: var(--muted); }
 .meters { display: flex; flex-direction: column; gap: 0.4rem; min-width: 120px; }
-.meter { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; color: var(--muted); }
-.bar { flex: 1; height: 6px; border: 1px solid var(--border-light); position: relative; background: transparent; }
+.meter { display: flex; align-items: center; gap: 0.4rem; font-family: var(--font); font-size: 0.6rem; color: var(--muted); }
+.bar { flex: 1; height: 4px; border: 1px solid var(--border-light); position: relative; background: transparent; }
 .fill { position: absolute; top: 0; left: 0; height: 100%; background: var(--accent); opacity: 0.5; }
-.empty { font-style: italic; color: var(--muted); font-size: 1.1rem; }
+.empty { font-style: italic; color: var(--muted); font-size: 0.9rem; }

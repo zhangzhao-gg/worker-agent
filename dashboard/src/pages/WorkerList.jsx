@@ -14,11 +14,11 @@ export default function WorkerList({ onSelect }) {
   return (
     <div className={styles.container}>
       <nav className={styles.nav}>
-        <div className={styles.logo}>工人档案</div>
-        <span className={styles.label}>花名册</span>
+        <div className={styles.logo}>WORKER ARCHIVE</div>
+        <span className={styles.label}>NEW LONDON REGISTRY</span>
       </nav>
       <main className={styles.main}>
-        <h1 className={styles.title}>新伦敦工人花名册</h1>
+        <h1 className={styles.title}>Worker Registry</h1>
         <div className={styles.grid}>
           {workers.map(w => (
             <div key={w.name} className={styles.card} onClick={() => onSelect(w.name)}>
