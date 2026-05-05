@@ -41,10 +41,6 @@ cd dashboard && npm run dev
 
 ## 部署
 
-```bash
-rsync -avz --exclude='node_modules' --exclude='.git' --exclude='dist' \
-  -e ssh dashboard/ ubuntu@81.70.158.243:/opt/worker-agent/dashboard/
-ssh ubuntu@81.70.158.243 "cd /opt/worker-agent/dashboard && npx vite build && sudo systemctl restart dashboard-api"
-```
+详见 `docs/deploy.md`（本地文件，未入 git）
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

@@ -22,8 +22,7 @@ dashboard/package.json - Dashboard Node 依赖
 ## 线上部署
 
 - 域名: https://worker.okethan.top
-- 服务器: 81.70.158.243 (Ubuntu 24.04)
 - 部署方式: rsync + vite build + systemctl restart
-- 详见 docs/deploy.md
+- 详见 docs/deploy.md（本地文件，未入 git）
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md

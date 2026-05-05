@@ -42,10 +42,10 @@
 - 重启自动恢复：扫描 data/*.db，恢复所有工人
 
 ### 部署
-- 服务器：81.70.158.243 (Ubuntu 24.04)
 - HTTPS：Let's Encrypt 自动续期
 - 进程管理：systemd（worker-agent + dashboard-api）
 - 反代：Nginx，静态文件 + API 代理
+- 详细配置见 docs/deploy.md（本地文件，未入 git）
 
 ---
 

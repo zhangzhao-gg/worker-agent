@@ -5,3 +5,4 @@ data/
 dashboard/node_modules/
 dashboard/dist/
 zhangzhao.pem
+docs/deploy.md
