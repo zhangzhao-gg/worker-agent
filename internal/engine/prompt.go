@@ -122,8 +122,10 @@ func buildInitialMessage(trigger string, ctx RunContext) string {
 		}
 	}
 
-	if len(ctx.Heartbeats) > 0 {
-		b.WriteString("\n心跳计划概况（昨天 + 今天 + 明天）：\n")
+	b.WriteString("\n心跳计划概况（昨天 + 今天 + 明天）：\n")
+	if len(ctx.Heartbeats) == 0 {
+		b.WriteString("  （空）\n")
+	} else {
 		type dayStat struct {
 			total, done, pending, skipped int
 			samples                       []string
@@ -174,8 +176,10 @@ func buildInitialMessage(trigger string, ctx RunContext) string {
 		}
 	}
 
-	if len(ctx.Wakeups) > 0 {
-		b.WriteString("\n已有的唤醒计划（过去3天 + 未来3天），请勿重复安排相同时间段的唤醒：\n")
+	b.WriteString("\n已有的唤醒计划（过去3天 + 未来3天），请勿重复安排相同时间段的唤醒：\n")
+	if len(ctx.Wakeups) == 0 {
+		b.WriteString("  （空）\n")
+	} else {
 		for _, w := range ctx.Wakeups {
 			b.WriteString(fmt.Sprintf("- [id=%d] [%s] %s（%s）\n", w.ID, w.Datetime, w.Reason, w.Status))
 		}

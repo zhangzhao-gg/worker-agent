@@ -12,11 +12,22 @@ import (
 	"errors"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"worker-agent/internal/db"
 	"worker-agent/internal/engine"
 )
+
+// ================================================================
+//  Per-worker 推理锁
+// ================================================================
+
+var reasoning atomic.Bool
+
+func IsReasoning() bool {
+	return reasoning.Load()
+}
 
 // ================================================================
 //  唤醒调度协程
@@ -33,6 +44,12 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 		select {
 		case signal := <-wakeupCh:
 			log.Printf("[唤醒] 收到紧急信号: trigger=%s", signal.Trigger)
+			if reasoning.Load() {
+				log.Println("[唤醒] 正在推理中，紧急信号暂存为事件")
+				database.InsertEvent(signal.News)
+				continue
+			}
+			reasoning.Store(true)
 			if err := handleWakeup(database, eng, signal.Trigger, signal.News, ""); err != nil {
 				if errors.Is(err, engine.ErrSelfDestruct) {
 					log.Println("[唤醒] ☠ 工人自我终结，协程退出")
@@ -40,10 +57,15 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 				}
 				log.Printf("[唤醒] 紧急唤醒失败: %v", err)
 			}
+			reasoning.Store(false)
 
 		case <-ticker.C:
 			now := time.Now().Format(time.RFC3339)
 			log.Printf("[唤醒] 定时扫描 pending wakeups, now=%s", now)
+			if reasoning.Load() {
+				log.Println("[唤醒] 正在推理中，跳过本轮扫描")
+				continue
+			}
 			entries, err := database.GetPendingWakeups(now)
 			if err != nil {
 				log.Printf("[唤醒] 查询计划失败: %v", err)
@@ -52,6 +74,7 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 			log.Printf("[唤醒] 扫描到 %d 条待处理唤醒", len(entries))
 			for _, entry := range entries {
 				log.Printf("[唤醒] 触发唤醒: id=%d, datetime=%s, reason=%s", entry.ID, entry.Datetime, entry.Reason)
+				reasoning.Store(true)
 				if err := handleWakeup(database, eng, "scheduled_wakeup", "", entry.Reason); err != nil {
 					if errors.Is(err, engine.ErrSelfDestruct) {
 						log.Println("[唤醒] ☠ 工人自我终结，协程退出")
@@ -61,6 +84,7 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 				} else {
 					database.MarkWakeupDone(entry.ID)
 				}
+				reasoning.Store(false)
 			}
 
 		case <-ctx.Done():

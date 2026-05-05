@@ -65,6 +65,7 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 	cfg.LogFn(0, "system_prompt", cfg.Prompt)
 	cfg.LogFn(0, "input", initialMessage)
 	roundsWithoutTodo := 0
+	reviewed := false
 
 	for round := 0; round < MaxAgentRounds; round++ {
 		// ── 压缩管线 ──
@@ -97,6 +98,16 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 
 		// ── 推理结束? ──
 		if resp.StopReason != "tool_calls" {
+			if !reviewed {
+				reviewed = true
+				log.Printf("│ ⟳ 首次 stop，注入审视提示")
+				log.Println("└──────────────────────────────────────────────────────────")
+				messages = append(messages, llm.Message{
+					Role:    "user",
+					Content: "<review>在结束前，请审视你这次思考的完整性：1) 心跳计划是否覆盖了需要的时段？2) 唤醒计划是否合理？3) 有没有遗漏的行动？如果一切正常就直接说「确认完毕」，如果发现遗漏请立即补充。</review>",
+				})
+				continue
+			}
 			log.Printf("│ ■ 推理结束 (reason=%s)", resp.StopReason)
 			log.Println("└──────────────────────────────────────────────────────────")
 			log.Println("╔══════════════════════════════════════════════════════════")

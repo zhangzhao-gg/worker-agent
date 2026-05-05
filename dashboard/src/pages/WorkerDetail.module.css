@@ -75,6 +75,7 @@
 .badgeDone { border-color: var(--border-light); color: var(--muted); }
 .badgeWarn { border-color: #ef4444; color: #b91c1c; }
 .empty { font-style: italic; color: var(--muted); font-size: 1.1rem; }
+.reasonCell { display: inline-block; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 
 /* Table */
 .table { width: 100%; border-collapse: collapse; }

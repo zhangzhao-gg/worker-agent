@@ -418,7 +418,8 @@ function WakeupTable({ data }) {
         <tbody>
           {slice.map(r => (
             <tr key={r.id}>
-              <td>{fmtTime(r.datetime)}</td><td>{r.reason}</td>
+              <td>{fmtTime(r.datetime)}</td>
+              <td><span className={styles.reasonCell} title={r.reason}>{r.reason}</span></td>
               <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
             </tr>
           ))}
