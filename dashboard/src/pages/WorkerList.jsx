@@ -22,7 +22,9 @@ export default function WorkerList({ onSelect }) {
         <div className={styles.grid}>
           {workers.map(w => (
             <div key={w.name} className={styles.card} onClick={() => onSelect(w.name)}>
-              <div className={styles.avatar}>{w.name[0]?.toUpperCase()}</div>
+              <div className={styles.avatar}>
+                {w.avatar ? <img src={w.avatar} className={styles.avatarImg} /> : w.name[0]?.toUpperCase()}
+              </div>
               <div className={styles.info}>
                 <div className={styles.name}>{w.name}</div>
                 <div className={styles.occupation}>{w.occupation}</div>

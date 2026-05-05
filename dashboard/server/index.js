@@ -58,7 +58,7 @@ app.get('/api/workers', (req, res) => {
     const db = getDB(name)
     if (!db) return null
     try {
-      const soul = db.prepare('SELECT name, occupation, mood, hope, grievance FROM soul WHERE id = 1').get()
+      const soul = db.prepare('SELECT name, occupation, mood, hope, grievance, avatar FROM soul WHERE id = 1').get()
       const pending = db.prepare('SELECT COUNT(*) as c FROM wakeup_schedule WHERE status = ?').get('pending')
       return {
         name,
@@ -66,6 +66,7 @@ app.get('/api/workers', (req, res) => {
         mood: soul?.mood || 0,
         hope: soul?.hope || 0,
         grievance: soul?.grievance || 0,
+        avatar: soul?.avatar || '',
         status: pending?.c > 0 ? 'running' : 'stopped'
       }
     } catch { return null }

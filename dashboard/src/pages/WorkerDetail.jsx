@@ -144,7 +144,9 @@ export default function WorkerDetail({ name, onBack }) {
           {/* 左栏 */}
           <aside className={styles.sidebar}>
             <div className={styles.avatarSection}>
-              <div className={styles.avatarLg}>{(soul.name || name)[0]?.toUpperCase()}</div>
+              <div className={styles.avatarLg}>
+                {soul.avatar ? <img src={soul.avatar} className={styles.avatarImg} /> : (soul.name || name)[0]?.toUpperCase()}
+              </div>
               <h2 className={styles.soulName}>{soul.name}</h2>
               <div className={styles.occupation}>{soul.occupation}</div>
               <div className={styles.statusBar}>Status: {worker.status}</div>
@@ -264,8 +266,8 @@ function MemoryTab({ name }) {
         <span className={styles.mechLabel}>MEMORY</span>
       </div>
       <div className={styles.logList}>
-        {data.map(item => (
-          <article key={item.id} className={styles.logItem} onClick={() => toggle(item.id)}>
+        {data.map((item, i) => (
+          <article key={item.id} className={styles.logItem} style={{ animationDelay: `${i * 40}ms` }} onClick={() => toggle(item.id)}>
             <div className={styles.logMeta}>
               <span>{fmtTime(item.timestamp)}</span>
             </div>
@@ -300,8 +302,8 @@ function GenericTab({ name, tab }) {
         <span className={styles.mechLabel}>{TAB_LABELS[tab]}</span>
       </div>
       <div className={styles.logList}>
-        {data.map(item => (
-          <article key={item.id} className={styles.logItem}>
+        {data.map((item, i) => (
+          <article key={item.id} className={styles.logItem} style={{ animationDelay: `${i * 40}ms` }}>
             <div className={styles.logMeta}>
               <span>{fmtTime(item.timestamp || item.datetime)}</span>
               {item.type && <span className={styles.badge}>{item.type}</span>}
@@ -437,8 +439,8 @@ function ScheduleTable({ data }) {
       <table className={styles.table}>
         <thead><tr><th>日期</th><th>时间</th><th>任务</th><th>状态</th></tr></thead>
         <tbody>
-          {slice.map(r => (
-            <tr key={r.id}>
+          {slice.map((r, i) => (
+            <tr key={r.id} style={{ animationDelay: `${i * 30}ms` }}>
               <td>{r.date}</td><td>{r.time}</td><td>{r.task}</td>
               <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>
             </tr>
@@ -467,8 +469,8 @@ function WakeupTable({ data }) {
       <table className={styles.table}>
         <thead><tr><th>时间</th><th>原因</th><th>状态</th></tr></thead>
         <tbody>
-          {slice.map(r => (
-            <tr key={r.id}>
+          {slice.map((r, i) => (
+            <tr key={r.id} style={{ animationDelay: `${i * 30}ms` }}>
               <td>{fmtTime(r.datetime)}</td>
               <td><span className={styles.reasonCell} title={r.reason}>{r.reason}</span></td>
               <td><span className={`${styles.badge} ${r.status === 'done' ? styles.badgeDone : styles.badgeWarn}`}>{r.status}</span></td>

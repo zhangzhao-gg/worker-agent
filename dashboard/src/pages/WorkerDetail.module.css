@@ -26,7 +26,8 @@
 /* 左栏 */
 .sidebar { border-right: 1px solid var(--border); padding-right: 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
 .avatarSection { text-align: center; }
-.avatarLg { width: 100px; height: 100px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 2.5rem; color: var(--accent); margin: 0 auto 0.75rem; background: var(--surface-alt); }
+.avatarLg { width: 100px; height: 100px; border-radius: 50%; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-family: var(--font); font-size: 2.5rem; color: var(--accent); margin: 0 auto 0.75rem; background: var(--surface-alt); overflow: hidden; }
+.avatarImg { width: 100%; height: 100%; object-fit: cover; }
 .soulName { font-size: 1.3rem; font-weight: 500; color: var(--ink); }
 .occupation { font-family: var(--font); font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-top: 0.25rem; }
 .statusBar { font-family: var(--font); text-transform: uppercase; letter-spacing: 0.08em; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 0.4rem 1.5rem; margin-top: 0.75rem; font-size: 0.7rem; color: var(--muted); }
@@ -70,7 +71,8 @@
 .tabActive { opacity: 1; border-bottom-color: var(--accent); color: var(--accent); }
 
 /* 设备面板 — 纸张嵌入在机器中 */
-.parchmentWrap { padding: 1rem 1.2rem 1.2rem; background-color: #1a1410; background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.02) 1px, transparent 0), linear-gradient(rgba(0,0,0,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.2) 1px, transparent 1px); background-size: 40px 40px, 4px 4px, 4px 4px; border: 0.5px solid rgba(244,164,98,0.25); box-shadow: inset 0 0 30px rgba(0,0,0,0.4), 0 0 8px rgba(244,164,98,0.05); border-radius: 2px; position: relative; }
+.parchmentWrap { padding: 1rem 1.2rem 1.2rem; background-color: #1a1410; background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.02) 1px, transparent 0), linear-gradient(rgba(0,0,0,0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.2) 1px, transparent 1px); background-size: 40px 40px, 4px 4px, 4px 4px; border: 0.5px solid rgba(244,164,98,0.25); box-shadow: inset 0 0 30px rgba(0,0,0,0.4), 0 0 8px rgba(244,164,98,0.05); border-radius: 2px; position: relative; animation: panelIn 0.4s ease; }
+@keyframes panelIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* 机械横条 — 纸带上方的打字机进纸器 */
 .mechBar { background: linear-gradient(to bottom, #2a1f18, #1a1410); border-bottom: 2px solid #3d2b1d; box-shadow: 0 4px 6px rgba(0,0,0,0.4); height: 1.8rem; border-radius: 4px 4px 0 0; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 0; }
@@ -79,7 +81,8 @@
 
 /* Log list — 羊皮纸纸带 */
 .logList { display: flex; flex-direction: column; gap: 0; background: #d4c4a8; background-image: linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px); background-size: 100% 1.6rem; box-shadow: inset 0 0 20px rgba(0,0,0,0.08), 0 4px 20px rgba(0,0,0,0.5); padding: 1.2rem 1.5rem; border-radius: 2px; border: 1px solid rgba(212,196,168,0.4); }
-.logItem { padding: 0.8rem 0 0.8rem 0.75rem; border-left: 2px solid rgba(42,31,24,0.2); border-bottom: 1px dashed rgba(42,31,24,0.1); cursor: default; }
+.logItem { padding: 0.8rem 0 0.8rem 0.75rem; border-left: 2px solid rgba(42,31,24,0.2); border-bottom: 1px dashed rgba(42,31,24,0.1); cursor: default; animation: tickerIn 0.3s ease both; }
+@keyframes tickerIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .logItem:last-child { border-bottom: none; }
 .logMeta { display: flex; align-items: center; gap: 0.6rem; font-family: var(--font); font-size: 0.6rem; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(42,31,24,0.6); margin-bottom: 0.3rem; flex-wrap: wrap; text-shadow: 0 0 0.3px rgba(42,31,24,0.5); }
 .logContent { font-family: var(--font-body); font-size: 0.9rem; line-height: 1.7; transition: filter 0.2s; color: #1a1208; text-shadow: 0 0 0.5px #1a1208, 0.3px 0.3px 0.5px rgba(26,18,8,0.4); -webkit-font-smoothing: antialiased; }
@@ -95,6 +98,7 @@
 .table { width: 100%; border-collapse: collapse; background: #d4c4a8; background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px); background-size: 100% 2rem; box-shadow: inset 0 0 15px rgba(0,0,0,0.06), 0 4px 20px rgba(0,0,0,0.5); border-radius: 2px; border: 1px solid rgba(212,196,168,0.4); }
 .table th { font-family: var(--font); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; text-align: left; padding: 0.6rem 0.8rem; border-bottom: 1px solid rgba(42,31,24,0.2); color: rgba(42,31,24,0.7); text-shadow: 0 0 0.3px rgba(42,31,24,0.5); }
 .table td { padding: 0.6rem 0.8rem; border-bottom: 1px solid rgba(42,31,24,0.08); font-size: 0.8rem; color: #1a1208; text-shadow: 0 0 0.5px #1a1208, 0.3px 0.3px 0.5px rgba(26,18,8,0.4); }
+.table tbody tr { animation: tickerIn 0.3s ease both; }
 
 /* Pagination */
 .pagination { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1rem 0; }
