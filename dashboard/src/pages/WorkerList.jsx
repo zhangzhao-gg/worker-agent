@@ -14,11 +14,11 @@ export default function WorkerList({ onSelect }) {
   return (
     <div className={styles.container}>
       <nav className={styles.nav}>
-        <div className={styles.logo}>WORKER ARCHIVE</div>
-        <span className={styles.label}>CATALOGUE</span>
+        <div className={styles.logo}>工人档案</div>
+        <span className={styles.label}>花名册</span>
       </nav>
       <main className={styles.main}>
-        <h1 className={styles.title}>Worker Catalogue</h1>
+        <h1 className={styles.title}>新伦敦工人花名册</h1>
         <div className={styles.grid}>
           {workers.map(w => (
             <div key={w.name} className={styles.card} onClick={() => onSelect(w.name)}>
@@ -29,13 +29,13 @@ export default function WorkerList({ onSelect }) {
                 <div className={styles.status} data-status={w.status}>{w.status}</div>
               </div>
               <div className={styles.meters}>
-                <Meter label="Mood" value={w.mood} />
-                <Meter label="Hope" value={w.hope} />
-                <Meter label="Grievance" value={w.grievance} />
+                <Meter label="心情" value={w.mood} />
+                <Meter label="希望" value={w.hope} />
+                <Meter label="不满" value={w.grievance} />
               </div>
             </div>
           ))}
-          {workers.length === 0 && <p className={styles.empty}>No workers found. Start a worker agent first.</p>}
+          {workers.length === 0 && <p className={styles.empty}>暂无工人。请先启动 Worker Agent。</p>}
         </div>
       </main>
     </div>

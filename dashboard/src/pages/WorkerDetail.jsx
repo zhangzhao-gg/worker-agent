@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './WorkerDetail.module.css'
 
 const TABS = ['narrative', 'memory', 'event', 'schedule', 'wakeup', 'reasoning']
-const TAB_LABELS = { narrative: 'NARRATIVE LOG', memory: 'PRIVATE MEMORY', event: 'CITY EVENTS', schedule: 'WORK SCHEDULE', wakeup: 'WAKEUP SCHEDULE', reasoning: 'REASONING' }
+const TAB_LABELS = { narrative: '对外叙事', memory: '私人记忆', event: '城市事件', schedule: '心跳计划', wakeup: '唤醒计划', reasoning: '推理日志' }
 
 export default function WorkerDetail({ name, onBack }) {
   const [tab, setTab] = useState('narrative')
@@ -34,11 +34,11 @@ export default function WorkerDetail({ name, onBack }) {
       if (data.ok) {
         setAdminCode(codeInput)
         setAdminVerified(true)
-        setMsg('Admin verified')
+        setMsg('验证通过')
       } else {
-        setMsg('Invalid code')
+        setMsg('验证码错误')
       }
-    } catch { setMsg('Verify failed') }
+    } catch { setMsg('验证失败') }
     setTimeout(() => setMsg(''), 3000)
   }
 
@@ -50,9 +50,9 @@ export default function WorkerDetail({ name, onBack }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason })
       })
-      setMsg('Wakeup scheduled')
+      setMsg('唤醒已安排')
       setWakeupReason('')
-    } catch (e) { setMsg('Failed: ' + e.message) }
+    } catch (e) { setMsg('失败: ' + e.message) }
     setTimeout(() => setMsg(''), 3000)
   }
 
@@ -81,9 +81,9 @@ export default function WorkerDetail({ name, onBack }) {
         setMsg('Dossier updated')
         fetch(`/api/workers/${name}`).then(r => r.json()).then(setWorker)
       } else {
-        setMsg('Failed: ' + await resp.text())
+        setMsg('失败: ' + await resp.text())
       }
-    } catch (e) { setMsg('Failed: ' + e.message) }
+    } catch (e) { setMsg('失败: ' + e.message) }
     setTimeout(() => setMsg(''), 3000)
   }
 
@@ -97,11 +97,11 @@ export default function WorkerDetail({ name, onBack }) {
       if (resp.ok) {
         location.reload()
       } else {
-        setMsg('Failed: ' + await resp.text())
+        setMsg('失败: ' + await resp.text())
         setTimeout(() => setMsg(''), 3000)
       }
     } catch (e) {
-      setMsg('Failed: ' + e.message)
+      setMsg('失败: ' + e.message)
       setTimeout(() => setMsg(''), 3000)
     }
   }
@@ -113,7 +113,7 @@ export default function WorkerDetail({ name, onBack }) {
   return (
     <div className={styles.container}>
       <nav className={styles.nav}>
-        <div className={styles.logo}>WORKER ARCHIVE</div>
+        <div className={styles.logo}>工人档案</div>
         <div className={styles.navLinks}>
           <a onClick={onBack}>CATALOGUE</a>
           <span className={styles.navActive}>ENTRIES</span>
@@ -127,8 +127,8 @@ export default function WorkerDetail({ name, onBack }) {
             <h1 className={styles.title}>Dossier: {soul.name || name}</h1>
           </div>
           <div className={styles.headerActions}>
-            {adminVerified && <button className={styles.resetBtn} onClick={doReset}>RESET</button>}
-            <button className={styles.backBtn} onClick={onBack}>&larr; BACK</button>
+            {adminVerified && <button className={styles.resetBtn} onClick={doReset}>重置</button>}
+            <button className={styles.backBtn} onClick={onBack}>&larr; 返回</button>
           </div>
         </header>
 
@@ -144,33 +144,33 @@ export default function WorkerDetail({ name, onBack }) {
 
             <div className={styles.section}>
               <h3 className={styles.sectionTitle}>VITAL METRICS</h3>
-              <Meter label="Mood" value={soul.mood} />
-              <Meter label="Hope" value={soul.hope} />
-              <Meter label="Grievance" value={soul.grievance} />
+              <Meter label="心情" value={soul.mood} />
+              <Meter label="希望" value={soul.hope} />
+              <Meter label="不满" value={soul.grievance} />
             </div>
 
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>BACKGROUND DOSSIER</h3>
-                {!editing && adminVerified && <button className={styles.btnSmall} onClick={startEdit}>EDIT</button>}
+                <h3 className={styles.sectionTitle}>人物档案</h3>
+                {!editing && adminVerified && <button className={styles.btnSmall} onClick={startEdit}>编辑</button>}
               </div>
               {editing ? (
                 <div className={styles.editForm}>
                   <EditField label="OCCUPATION" value={editForm.occupation} onChange={v => setEditForm(f => ({ ...f, occupation: v }))} />
-                  <EditField label="BACKGROUND" value={editForm.background} onChange={v => setEditForm(f => ({ ...f, background: v }))} textarea />
+                  <EditField label="背景故事" value={editForm.background} onChange={v => setEditForm(f => ({ ...f, background: v }))} textarea />
                   <EditField label="PERSONALITY" value={editForm.personality} onChange={v => setEditForm(f => ({ ...f, personality: v }))} textarea />
                   <EditField label="SPEECH STYLE" value={editForm.speech_style} onChange={v => setEditForm(f => ({ ...f, speech_style: v }))} textarea />
                   <EditField label="VALUES" value={editForm.values_desc} onChange={v => setEditForm(f => ({ ...f, values_desc: v }))} textarea />
                   <EditField label="FAMILY" value={editForm.family} onChange={v => setEditForm(f => ({ ...f, family: v }))} textarea />
                   <div className={styles.editActions}>
-                    <button className={styles.btn} onClick={saveEdit}>SAVE</button>
-                    <button className={styles.btnMuted} onClick={() => setEditing(false)}>CANCEL</button>
+                    <button className={styles.btn} onClick={saveEdit}>保存</button>
+                    <button className={styles.btnMuted} onClick={() => setEditing(false)}>取消</button>
                   </div>
                 </div>
               ) : (
                 <>
                   {soul.occupation && <Field label="OCCUPATION" value={soul.occupation} />}
-                  {soul.background && <Field label="BACKGROUND" value={soul.background} />}
+                  {soul.background && <Field label="背景故事" value={soul.background} />}
                   {soul.personality && <Field label="PERSONALITY" value={soul.personality} />}
                   {soul.speech_style && <Field label="SPEECH STYLE" value={soul.speech_style} />}
                   {soul.values_desc && <Field label="VALUES" value={soul.values_desc} />}
@@ -180,7 +180,7 @@ export default function WorkerDetail({ name, onBack }) {
             </div>
 
             <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>MANUAL WAKEUP</h3>
+              <h3 className={styles.sectionTitle}>手动唤醒</h3>
               <div className={styles.wakeupRow}>
                 <input
                   value={wakeupReason}
@@ -194,7 +194,7 @@ export default function WorkerDetail({ name, onBack }) {
             </div>
 
             <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>ADMIN ACCESS</h3>
+              <h3 className={styles.sectionTitle}>管理员验证</h3>
               {adminVerified ? (
                 <div className={styles.adminOk}>VERIFIED</div>
               ) : (
@@ -237,7 +237,43 @@ export default function WorkerDetail({ name, onBack }) {
 
 function TabContent({ name, tab }) {
   if (tab === 'reasoning') return <ReasoningTab name={name} />
+  if (tab === 'memory') return <MemoryTab name={name} />
   return <GenericTab name={name} tab={tab} />
+}
+
+function MemoryTab({ name }) {
+  const [data, setData] = useState([])
+  const [revealed, setRevealed] = useState(new Set())
+
+  useEffect(() => {
+    const load = () => fetch(`/api/workers/${name}/memories`).then(r => r.json()).then(setData).catch(() => {})
+    load()
+    const timer = setInterval(load, 15000)
+    return () => clearInterval(timer)
+  }, [name])
+
+  if (!data.length) return <p className={styles.empty}>暂无数据</p>
+
+  const toggle = (id) => {
+    setRevealed(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <div className={styles.logList}>
+      {data.map(item => (
+        <article key={item.id} className={styles.logItem} onClick={() => toggle(item.id)}>
+          <div className={styles.logMeta}>
+            <span>{fmtTime(item.timestamp)}</span>
+          </div>
+          <p className={`${styles.logContent} ${revealed.has(item.id) ? '' : styles.blurred}`}>{item.content}</p>
+        </article>
+      ))}
+    </div>
+  )
 }
 
 function GenericTab({ name, tab }) {
@@ -251,7 +287,7 @@ function GenericTab({ name, tab }) {
     return () => clearInterval(timer)
   }, [name, tab])
 
-  if (!data.length) return <p className={styles.empty}>No data yet.</p>
+  if (!data.length) return <p className={styles.empty}>暂无数据</p>
 
   if (tab === 'schedule') return <ScheduleTable data={data} />
   if (tab === 'wakeup') return <WakeupTable data={data} />
@@ -265,7 +301,7 @@ function GenericTab({ name, tab }) {
             {item.type && <span className={styles.badge}>{item.type}</span>}
             {item.processed !== undefined && (
               <span className={item.processed ? styles.badgeDone : styles.badgeWarn}>
-                {item.processed ? 'PROCESSED' : 'UNPROCESSED'}
+                {item.processed ? '已处理' : '未处理'}
               </span>
             )}
           </div>
@@ -327,7 +363,7 @@ function ReasoningTab({ name }) {
     <div className={styles.reasoningContainer}>
       {/* 左侧 session 列表 */}
       <div className={styles.sessionList}>
-        <div className={styles.sessionListHeader}>SESSIONS ({sessions.length})</div>
+        <div className={styles.sessionListHeader}>推理会话 ({sessions.length})</div>
         <div className={styles.sessionListScroll}>
           {sessions.map(s => (
             <div
@@ -337,13 +373,13 @@ function ReasoningTab({ name }) {
             >
               <div className={styles.sessionTime}>{fmtTime(s.startTime)}</div>
               <div className={styles.sessionMeta}>
-                <span>{s.rounds} rounds</span>
-                <span>{s.logs.length} entries</span>
+                <span>{s.rounds} 轮</span>
+                <span>{s.logs.length} 条</span>
               </div>
               <div className={styles.sessionId}>{s.id.slice(0, 8)}...</div>
             </div>
           ))}
-          {!sessions.length && <p className={styles.empty}>No sessions yet.</p>}
+          {!sessions.length && <p className={styles.empty}>暂无推理记录</p>}
         </div>
       </div>
 
@@ -352,7 +388,7 @@ function ReasoningTab({ name }) {
         {activeLogs.length ? (
           <>
             <div className={styles.sessionDetailHeader}>
-              <button className={styles.copyBtn} onClick={() => copySession(activeLogs)}>COPY ALL</button>
+              <button className={styles.copyBtn} onClick={() => copySession(activeLogs)}>复制全部</button>
             </div>
             <div ref={detailRef} className={styles.sessionDetailScroll}>
               {activeLogs.map(log => (
@@ -368,7 +404,7 @@ function ReasoningTab({ name }) {
             </div>
           </>
         ) : (
-          <p className={styles.empty}>Select a session to view reasoning chain.</p>
+          <p className={styles.empty}>选择一个 session 查看推理链路</p>
         )}
       </div>
     </div>
@@ -388,7 +424,7 @@ function ScheduleTable({ data }) {
   return (
     <div>
       <table className={styles.table}>
-        <thead><tr><th>DATE</th><th>TIME</th><th>TASK</th><th>STATUS</th></tr></thead>
+        <thead><tr><th>日期</th><th>时间</th><th>任务</th><th>状态</th></tr></thead>
         <tbody>
           {slice.map(r => (
             <tr key={r.id}>
@@ -414,7 +450,7 @@ function WakeupTable({ data }) {
   return (
     <div>
       <table className={styles.table}>
-        <thead><tr><th>DATETIME</th><th>REASON</th><th>STATUS</th></tr></thead>
+        <thead><tr><th>时间</th><th>原因</th><th>状态</th></tr></thead>
         <tbody>
           {slice.map(r => (
             <tr key={r.id}>
@@ -435,9 +471,9 @@ function WakeupTable({ data }) {
 function Pagination({ page, totalPages, onChange }) {
   return (
     <div className={styles.pagination}>
-      <button className={styles.pageBtn} disabled={page === 0} onClick={() => onChange(page - 1)}>&laquo; PREV</button>
+      <button className={styles.pageBtn} disabled={page === 0} onClick={() => onChange(page - 1)}>&laquo; 上一页</button>
       <span className={styles.pageInfo}>{page + 1} / {totalPages}</span>
-      <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => onChange(page + 1)}>NEXT &raquo;</button>
+      <button className={styles.pageBtn} disabled={page >= totalPages - 1} onClick={() => onChange(page + 1)}>下一页 &raquo;</button>
     </div>
   )
 }
