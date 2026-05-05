@@ -52,6 +52,7 @@ export default function WorkerDetail({ name, onBack }) {
       })
       setMsg('唤醒已安排')
       setWakeupReason('')
+      setTab('wakeup')
     } catch (e) { setMsg('失败: ' + e.message) }
     setTimeout(() => setMsg(''), 3000)
   }

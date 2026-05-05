@@ -1,17 +1,15 @@
 # Worker Agent
 
-> 这座城市不够好。但会好起来的。我们会让它好起来。
+新伦敦城市模拟系统 — 每个工人是一个独立 AI Agent，拥有记忆、情绪、工作节律和自主决策能力。
 
-新伦敦城市模拟系统的灵魂——每个工人是一个独立的 AI Agent，拥有记忆、情绪、工作节律和自主决策能力。他们在零下的寒风里挖煤、思考、希望、绝望，然后继续活着。
+## 概述
 
-## 这是什么
+让 LLM 扮演城市工人的自主 Agent 系统。不是聊天机器人，是持续运行的角色：
 
-一个让 LLM 扮演城市工人的自主 Agent 系统。不是聊天机器人，是活着的角色：
-
-- **心跳**：身体每 10 分钟机械执行一次任务汇报，像齿轮一样精确
-- **唤醒**：大脑在关键时刻醒来思考——早晨规划、晚间复盘、突发决策
-- **记忆**：私人想法持久化，跨会话延续，像日记本一样积累
-- **情绪**：mood / hope / grievance 三个维度，影响决策，被世界塑造
+- **心跳**：身体每 10 分钟机械执行一次任务汇报
+- **唤醒**：大脑在关键时刻醒来思考 — 早晨规划、晚间复盘、突发决策
+- **记忆**：私人想法持久化，跨会话延续
+- **情绪**：mood / hope / grievance 三维度，影响决策，被世界塑造
 - **叙事**：对外可见的生活记录，同步到城市日志
 
 ## 架构
@@ -25,8 +23,8 @@
 │  └── HTTP API — 创建/管理/事件推送               │
 ├─────────────────────────────────────────────────┤
 │  Dashboard (Node.js)                            │
-│  ├── Express API — 只读直连 SQLite               │
-│  └── React UI — 实时展示工人状态和推理链          │
+│  ├── Express API — 直连 SQLite 读写              │
+│  └── React UI — 黄皮纸/油墨/撕裂边缘视觉风格      │
 ├─────────────────────────────────────────────────┤
 │  SQLite (WAL)                                   │
 │  每个工人一个 .db 文件，7 张表                    │
@@ -65,14 +63,27 @@ curl -X POST http://localhost:8080/api/workers \
 
 - **Worker**: Go + SQLite (WAL) + MiniMax (OpenAI 兼容 API)
 - **Dashboard**: Vite + React + Express + better-sqlite3
-- **通信**: Worker 写 DB，Dashboard 只读 DB，完全解耦
+- **通信**: Worker 写 DB，Dashboard 直连 DB 读写，完全解耦
 
-## 设计哲学
+## Dashboard 视觉风格
 
-简化是最高形式的复杂。
+黄皮纸 + 油墨文字 + 撕裂不规则边缘 + 墙面做旧背景，打字机风格 UI。详见 `docs/ink-effect.md`。
 
-每个工人一个 SQLite 文件——没有 Redis，没有消息队列，没有分布式一致性焦虑。一个文件就是一个完整的生命。
+## 线上部署
 
-心跳是身体，唤醒是灵魂。身体不需要思考，灵魂不需要每分钟都醒着。这个区分消除了 90% 的复杂度。
+- 域名: https://worker.okethan.top
+- 服务器: Ubuntu 24.04，Nginx 反代
+- 部署方式: rsync + vite build + systemctl restart
 
-> 活着就有希望。活着，才能改变。
+详见 `docs/deploy.md`。
+
+## 文档索引
+
+| 文档 | 内容 |
+|------|------|
+| `prd.md` | 产品需求文档，整体设计 |
+| `docs/business-layer.md` | 业务层技术设计 — 进程生命周期、心跳、唤醒调度 |
+| `docs/llm-reasoning-engine.md` | 推理引擎技术设计 — Agent Loop、Tool Dispatch、压缩 |
+| `docs/ink-effect.md` | Dashboard 视觉实现 — 黄皮纸、撕裂边缘、油墨效果 |
+| `docs/deploy.md` | 部署手册 — rsync、systemd、Nginx 配置 |
+| `docs/progress.md` | 开发进度跟踪 |

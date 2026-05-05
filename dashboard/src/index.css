@@ -27,13 +27,34 @@ body {
   min-height: 100vh;
   line-height: 1.6;
   font-size: 14px;
+  position: relative;
 }
 
-/* 电影暗角 */
+/* 墙面颗粒肌理 — 覆盖整个文档 */
+body::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0; min-height: 100%; z-index: 9990; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* 做旧色斑水渍 — 覆盖整个文档 */
+body::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0; min-height: 100%; z-index: 9991; pointer-events: none;
+  background:
+    radial-gradient(ellipse at 12% 15%, rgba(120,90,40,0.09) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 75%, rgba(100,70,30,0.08) 0%, transparent 40%),
+    radial-gradient(ellipse at 90% 10%, rgba(110,80,35,0.06) 0%, transparent 35%),
+    radial-gradient(ellipse at 45% 85%, rgba(90,65,25,0.07) 0%, transparent 30%),
+    radial-gradient(ellipse at 60% 40%, rgba(130,100,50,0.04) 0%, transparent 50%);
+}
+
+/* 电影暗角 — 固定视口 */
 .vignette {
   position: fixed; inset: 0; pointer-events: none; z-index: 9999;
   background: radial-gradient(ellipse at center, transparent 55%, rgba(42,31,24,0.15) 100%);
 }
+
 
 a { color: var(--accent); text-decoration: none; }
 a:hover { opacity: 0.7; }

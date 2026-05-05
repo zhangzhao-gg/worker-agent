@@ -9,13 +9,21 @@ internal/llm/    - LLM 抽象层，Client 接口 + MiniMax 实现
 internal/engine/ - LLM 推理引擎，agent loop + tool dispatch + 压缩 + todo + 推理日志
 internal/worker/ - 双协程，心跳协程（身体）+ 唤醒调度协程（大脑入口）+ 紧急判断
 internal/server/ - 纯 HTTP API + 工人生命周期管理 + 事件推送端点，DB 持久化重启自动恢复
-dashboard/       - Node.js 独立 Dashboard（Vite + React + Express + better-sqlite3），直连 data/*.db 读写，安全码保护写操作
-docs/            - 设计文档，PRD + 业务层 + 推理引擎 + 部署手册 + s_full.py 参考实现
+internal/web/    - 静态文件服务（头像等）
+dashboard/       - Node.js 独立 Dashboard（Vite + React + Express + better-sqlite3），直连 data/*.db 读写，安全码保护写操作，黄皮纸/油墨/撕裂边缘视觉风格
+docs/            - 设计文档：PRD + 业务层 + 推理引擎 + 视觉实现 + 部署手册 + 进度
 </directory>
 
 <config>
-go.mod - Go 模块定义，依赖 go-sqlite3
+go.mod             - Go 模块定义，依赖 go-sqlite3
 dashboard/package.json - Dashboard Node 依赖
 </config>
+
+## 线上部署
+
+- 域名: https://worker.okethan.top
+- 服务器: 81.70.158.243 (Ubuntu 24.04)
+- 部署方式: rsync + vite build + systemctl restart
+- 详见 docs/deploy.md
 
 [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
