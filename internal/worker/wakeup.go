@@ -104,7 +104,7 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 	}
 	log.Printf("[唤醒] soul 加载成功: name=%s", soul.Name)
 
-	summary, _ := database.GetLatestSummary()
+	persistentMemories, _ := database.GetPersistentMemories()
 	events, _ := database.GetUnprocessedEvents()
 
 	now := time.Now()
@@ -115,16 +115,16 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
 	heartbeats, _ := database.GetHeartbeatsByDateRange(yesterday, tomorrow)
-	log.Printf("[唤醒] 上下文: summary长度=%d, 未处理事件=%d, 唤醒记录=%d, 心跳=%d", len(summary), len(events), len(wakeups), len(heartbeats))
+	log.Printf("[唤醒] 上下文: 持久记忆=%d, 未处理事件=%d, 唤醒记录=%d, 心跳=%d", len(persistentMemories), len(events), len(wakeups), len(heartbeats))
 
 	ctx := engine.RunContext{
-		Soul:       soul,
-		Summary:    summary,
-		Events:     events,
-		Wakeups:    wakeups,
-		Heartbeats: heartbeats,
-		Reason:     reason,
-		News:       news,
+		Soul:               soul,
+		PersistentMemories: persistentMemories,
+		Events:             events,
+		Wakeups:            wakeups,
+		Heartbeats:         heartbeats,
+		Reason:             reason,
+		News:               news,
 	}
 
 	log.Println("[唤醒] 调用推理引擎 eng.Run()...")

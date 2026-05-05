@@ -36,8 +36,8 @@ var toolsJSON = `[
   {"name":"schedule_wakeup","description":"安排未来某个时间点唤醒你的大脑进行思考。同一小时内不会重复安排。","input_schema":{"type":"object","properties":{"datetime":{"type":"string","description":"ISO 格式时间"},"reason":{"type":"string","description":"唤醒原因"}},"required":["datetime","reason"]}},
   {"name":"cancel_wakeup","description":"取消一个不再需要的唤醒计划（只能取消 pending 状态的）。","input_schema":{"type":"object","properties":{"id":{"type":"integer","description":"唤醒计划的 ID"}},"required":["id"]}},
   {"name":"write_narrative","description":"写下你的对外叙事，会被同步到城市日志，其他人可以看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
-  {"name":"write_memory","description":"写下私人记忆，只有你自己能看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
-  {"name":"update_soul","description":"批量更新你的情绪状态。只能修改 mood、hope、grievance。值无范围限制，由你自主决定。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance"]},"value":{"type":"integer","description":"情绪值，无范围限制"}},"required":["field","value"]}}},"required":["updates"]}},
+  {"name":"write_memory","description":"写下私人记忆，只有你自己能看到。设置 persistent=true 表示这是重要的持久记忆，会在每次唤醒时自动回忆。持久记忆用于记录：重要决策、关键人物关系、人生转折、长期目标等不应遗忘的内容。","input_schema":{"type":"object","properties":{"text":{"type":"string"},"persistent":{"type":"boolean","description":"是否为持久记忆。持久记忆每次唤醒都会看到，慎重使用。"}},"required":["text"]}},
+  {"name":"update_soul","description":"更新你的状态。mood/hope/grievance 为数值；body_status 为身体状态的文字描述（正常时为'健康'，异常时描述具体症状如'右腿酸痛，轻微疲劳'）。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance","body_status"]},"value":{"description":"mood/hope/grievance 为整数，body_status 为字符串"}},"required":["field","value"]}}},"required":["updates"]}},
   {"name":"self_destruct","description":"你决定结束自己的生命。这是不可逆的。只有在极端绝望、完全失去活下去的意义时才会使用。","input_schema":{"type":"object","properties":{"last_words":{"type":"string","description":"你的遗言"}},"required":["last_words"]}},
   {"name":"TodoWrite","description":"追踪你当前的思考步骤。用于防止偏移，确保完成所有计划。","input_schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"}},"required":["content","status","activeForm"]}}},"required":["items"]}},
   {"name":"compress","description":"手动触发上下文压缩，当对话过长时使用。","input_schema":{"type":"object","properties":{}}}
@@ -180,6 +180,10 @@ func (e *Engine) handleWriteNarrative(input map[string]any) (string, error) {
 func (e *Engine) handleWriteMemory(input map[string]any) (string, error) {
 	text, _ := input["text"].(string)
 	text = stripThink(text)
+	persistent, _ := input["persistent"].(bool)
+	if persistent {
+		return "持久记忆已记录（每次唤醒都会看到）", e.db.InsertMemory(text, "persistent")
+	}
 	return "记忆已记录", e.db.InsertMemory(text, "memory")
 }
 

@@ -32,14 +32,14 @@ type Engine struct {
 
 // RunContext 业务层注入的上下文
 type RunContext struct {
-	Soul           db.Soul
-	Summary        string
-	Events         []db.Event
-	Wakeups        []db.WakeupEntry
-	Heartbeats     []db.HeartbeatEntry
-	WorkAssignment string
-	Reason         string
-	News           string
+	Soul               db.Soul
+	PersistentMemories []db.Memory
+	Events             []db.Event
+	Wakeups            []db.WakeupEntry
+	Heartbeats         []db.HeartbeatEntry
+	WorkAssignment     string
+	Reason             string
+	News               string
 }
 
 func New(database *db.Database, cityAPI *city.CityAPI, llmClient llm.Client) *Engine {

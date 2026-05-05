@@ -601,7 +601,13 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
               <>
                 <div className={styles.thinkingHeader}>
                   <span className={`${styles.statusDot} ${styles.dot_thinking}`} />
-                  <span>{thinkingStarted ? '正在思考' : '等待唤醒...'}</span>
+                  {thinkingStarted ? (
+                    <span className={styles.waveText}>
+                      {'正在思考'.split('').map((ch, i) => (
+                        <span key={i} style={{ animationDelay: `${i * 0.15}s` }}>{ch}</span>
+                      ))}
+                    </span>
+                  ) : <span>等待唤醒...</span>}
                 </div>
                 <div className={styles.thinkingSteps}>
                   {thinkingSteps.map((step, i) => (

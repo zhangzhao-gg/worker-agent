@@ -465,6 +465,15 @@
   letter-spacing: 0.08em;
   color: rgba(42,31,24,0.7);
 }
+.waveText span {
+  display: inline-block;
+  animation: wave 1.2s ease-in-out infinite;
+}
+@keyframes wave {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
 .thinkingSteps {
   padding: 0.6rem 0.75rem;
   display: flex;

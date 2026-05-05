@@ -39,11 +39,12 @@ type Soul struct {
 	Mood        int
 	Hope        int
 	Grievance   int
+	BodyStatus  string
 }
 
 type SoulUpdate struct {
-	Field string
-	Value int
+	Field string      `json:"field"`
+	Value interface{} `json:"value"`
 }
 
 type HeartbeatEntry struct {
@@ -100,6 +101,7 @@ func New(dbPath string) (*Database, error) {
 		conn.Close()
 		return nil, fmt.Errorf("建表: %w", err)
 	}
+	d.migrate()
 	return d, nil
 }
 
@@ -110,6 +112,10 @@ func NewReadOnly(dbPath string) (*Database, error) {
 		return nil, fmt.Errorf("只读打开数据库: %w", err)
 	}
 	return &Database{db: conn}, nil
+}
+
+func (d *Database) migrate() {
+	d.db.Exec("ALTER TABLE soul ADD COLUMN body_status TEXT DEFAULT '健康'")
 }
 
 func (d *Database) Close() error {
@@ -130,7 +136,8 @@ func (d *Database) createTables() error {
 		avatar       TEXT DEFAULT '',
 		mood         INTEGER DEFAULT 50,
 		hope         INTEGER DEFAULT 50,
-		grievance    INTEGER DEFAULT 0
+		grievance    INTEGER DEFAULT 0,
+		body_status  TEXT DEFAULT '健康'
 	);
 	CREATE TABLE IF NOT EXISTS heartbeat_schedule (
 		id     INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -181,11 +188,11 @@ func (d *Database) createTables() error {
 func (d *Database) GetSoul() (Soul, error) {
 	var s Soul
 	err := d.db.QueryRow(`SELECT name, occupation, background, personality,
-		speech_style, values_desc, family, avatar, mood, hope, grievance
+		speech_style, values_desc, family, avatar, mood, hope, grievance, body_status
 		FROM soul WHERE id = 1`).Scan(
 		&s.Name, &s.Occupation, &s.Background, &s.Personality,
 		&s.SpeechStyle, &s.ValuesDesc, &s.Family, &s.Avatar,
-		&s.Mood, &s.Hope, &s.Grievance,
+		&s.Mood, &s.Hope, &s.Grievance, &s.BodyStatus,
 	)
 	return s, err
 }
@@ -197,7 +204,7 @@ func (d *Database) UpdateSoul(updates []SoulUpdate) error {
 	}
 	defer tx.Rollback()
 
-	allowed := map[string]bool{"mood": true, "hope": true, "grievance": true}
+	allowed := map[string]bool{"mood": true, "hope": true, "grievance": true, "body_status": true}
 	for _, u := range updates {
 		if !allowed[u.Field] {
 			return fmt.Errorf("禁止修改字段: %s", u.Field)
@@ -212,11 +219,11 @@ func (d *Database) UpdateSoul(updates []SoulUpdate) error {
 
 func (d *Database) InitSoul(s Soul) error {
 	_, err := d.db.Exec(`INSERT OR REPLACE INTO soul
-		(id, name, occupation, background, personality, speech_style, values_desc, family, avatar, mood, hope, grievance)
-		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		(id, name, occupation, background, personality, speech_style, values_desc, family, avatar, mood, hope, grievance, body_status)
+		VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		s.Name, s.Occupation, s.Background, s.Personality,
 		s.SpeechStyle, s.ValuesDesc, s.Family, s.Avatar,
-		s.Mood, s.Hope, s.Grievance,
+		s.Mood, s.Hope, s.Grievance, s.BodyStatus,
 	)
 	return err
 }
@@ -479,6 +486,28 @@ func (d *Database) GetLatestSummary() (string, error) {
 		return "", nil
 	}
 	return content, err
+}
+
+func (d *Database) GetPersistentMemories() ([]Memory, error) {
+	rows, err := d.db.Query("SELECT id, timestamp, content, type FROM memories WHERE type = 'persistent' ORDER BY id ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var memories []Memory
+	for rows.Next() {
+		var m Memory
+		if err := rows.Scan(&m.ID, &m.Timestamp, &m.Content, &m.Type); err != nil {
+			return nil, err
+		}
+		memories = append(memories, m)
+	}
+	return memories, rows.Err()
+}
+
+func (d *Database) DeleteMemory(id int64) error {
+	_, err := d.db.Exec("DELETE FROM memories WHERE id = ?", id)
+	return err
 }
 
 // ================================================================

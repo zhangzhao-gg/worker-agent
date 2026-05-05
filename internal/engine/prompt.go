@@ -24,10 +24,11 @@ func buildSystemPrompt(ctx RunContext) string {
 你的价值观：%s
 你的家人：%s
 
-当前情绪状态：
+当前状态：
   心情：%d
   希望：%d
   不满：%d
+  身体：%s
 
 ═══════════════════════════════════════
   工作制度（城市强制规定，不可违反）
@@ -69,7 +70,8 @@ func buildSystemPrompt(ctx RunContext) string {
 ═══════════════════════════════════════
 
 - 每次思考结束前，确保未来至少有一个 pending 的唤醒
-- 用 write_memory 记录重要想法
+- 用 write_memory 记录想法。设置 persistent=true 的记忆会在每次唤醒时自动回忆
+- 持久记忆用于：重要决策、关键人物关系、人生转折、长期目标。不要滥用，只记真正重要的
 - 用 write_narrative 分享生活状态（其他人可以看到）
 - 用 update_soul 更新情绪
 
@@ -86,7 +88,7 @@ func buildSystemPrompt(ctx RunContext) string {
 		s.SpeechStyle,
 		s.ValuesDesc,
 		s.Family,
-		s.Mood, s.Hope, s.Grievance,
+		s.Mood, s.Hope, s.Grievance, s.BodyStatus,
 	)
 }
 
@@ -111,8 +113,11 @@ func buildInitialMessage(trigger string, ctx RunContext) string {
 		b.WriteString(fmt.Sprintf("\n今日工作分配：%s\n", ctx.WorkAssignment))
 	}
 
-	if ctx.Summary != "" {
-		b.WriteString(fmt.Sprintf("\n你最近的记忆摘要：\n%s\n", ctx.Summary))
+	if len(ctx.PersistentMemories) > 0 {
+		b.WriteString("\n你的持久记忆（重要，不可遗忘）：\n")
+		for _, m := range ctx.PersistentMemories {
+			b.WriteString(fmt.Sprintf("- [id=%d] %s\n", m.ID, m.Content))
+		}
 	}
 
 	if len(ctx.Events) > 0 {
