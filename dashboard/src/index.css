@@ -1,14 +1,22 @@
+@font-face {
+  font-family: 'Special Elite';
+  src: url('/fonts/SpecialElite.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  --ink: #d4c4a8;
-  --accent: #f4a462;
-  --surface: #0a0a0f;
-  --surface-alt: #1a1410;
-  --border: rgba(244, 164, 98, 0.25);
-  --border-light: rgba(244, 164, 98, 0.12);
-  --muted: rgba(212, 196, 168, 0.5);
-  --font: Menlo, Consolas, 'Courier New', monospace;
+  --ink: #2a1f18;
+  --accent: #8b5e3c;
+  --surface: #f0ebe4;
+  --surface-alt: #e8e0d6;
+  --border: rgba(139, 94, 60, 0.25);
+  --border-light: rgba(139, 94, 60, 0.12);
+  --muted: rgba(42, 31, 24, 0.45);
+  --font: 'Special Elite', Menlo, Consolas, monospace;
   --font-body: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
@@ -19,13 +27,18 @@ body {
   min-height: 100vh;
   line-height: 1.6;
   font-size: 14px;
-  text-shadow: 0.5px 0.5px 1px rgba(0,0,0,0.8), 0 0 2px rgba(244,164,98,0.05);
+}
+
+/* 电影暗角 */
+.vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(42,31,24,0.15) 100%);
 }
 
 a { color: var(--accent); text-decoration: none; }
-a:hover { opacity: 0.8; }
+a:hover { opacity: 0.7; }
 
 /* 滚动条 */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(244,164,98,0.2); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgba(139,94,60,0.25); border-radius: 2px; }

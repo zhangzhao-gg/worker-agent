@@ -261,10 +261,6 @@ function MemoryTab({ name }) {
 
   return (
     <div className={styles.parchmentWrap}>
-      <div className={styles.mechBar}>
-        <div className={styles.mechLine} />
-        <span className={styles.mechLabel}>MEMORY</span>
-      </div>
       <div className={styles.logList}>
         {data.map((item, i) => (
           <article key={item.id} className={styles.logItem} style={{ animationDelay: `${i * 40}ms` }} onClick={() => toggle(item.id)}>
@@ -297,10 +293,6 @@ function GenericTab({ name, tab }) {
 
   return (
     <div className={styles.parchmentWrap}>
-      <div className={styles.mechBar}>
-        <div className={styles.mechLine} />
-        <span className={styles.mechLabel}>{TAB_LABELS[tab]}</span>
-      </div>
       <div className={styles.logList}>
         {data.map((item, i) => (
           <article key={item.id} className={styles.logItem} style={{ animationDelay: `${i * 40}ms` }}>
@@ -432,10 +424,6 @@ function ScheduleTable({ data }) {
 
   return (
     <div className={styles.parchmentWrap}>
-      <div className={styles.mechBar}>
-        <div className={styles.mechLine} />
-        <span className={styles.mechLabel}>心跳计划</span>
-      </div>
       <table className={styles.table}>
         <thead><tr><th>日期</th><th>时间</th><th>任务</th><th>状态</th></tr></thead>
         <tbody>
@@ -462,10 +450,6 @@ function WakeupTable({ data }) {
 
   return (
     <div className={styles.parchmentWrap}>
-      <div className={styles.mechBar}>
-        <div className={styles.mechLine} />
-        <span className={styles.mechLabel}>唤醒计划</span>
-      </div>
       <table className={styles.table}>
         <thead><tr><th>时间</th><th>原因</th><th>状态</th></tr></thead>
         <tbody>
