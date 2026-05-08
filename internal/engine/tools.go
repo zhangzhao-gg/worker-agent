@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/llm
  * [OUTPUT]: 对外提供 loadToolDefs() 和 Engine.buildHandlers()
- * [POS]: internal/engine 的工具注册表，14 个工具（6 感知 + 6 行动 + 2 元）
+ * [POS]: internal/engine 的工具注册表，12 个工具（2 感知 + 9 行动 + 1 终极）
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"worker-agent/internal/db"
@@ -25,22 +26,17 @@ var thinkTagRe = regexp.MustCompile(`<think>[\s\S]*?</think>\s*`)
 // ================================================================
 
 var toolsJSON = `[
-  {"name":"get_city_temperature","description":"感知当前城市温度，返回模糊描述。","input_schema":{"type":"object","properties":{}}},
-  {"name":"get_food_status","description":"感知食物供给状态，返回模糊描述。","input_schema":{"type":"object","properties":{}}},
-  {"name":"get_city_announcements","description":"获取执政官公告列表。","input_schema":{"type":"object","properties":{}}},
-  {"name":"get_my_work_assignment","description":"获取今天城市分配给你的工作任务。","input_schema":{"type":"object","properties":{}}},
-  {"name":"get_recent_events","description":"回忆最近发生的事件。","input_schema":{"type":"object","properties":{"n":{"type":"integer","description":"返回条数"}},"required":["n"]}},
-  {"name":"get_memories","description":"回忆自己之前的想法和记忆。","input_schema":{"type":"object","properties":{"n":{"type":"integer","description":"返回条数"}},"required":["n"]}},
-  {"name":"write_heartbeat_schedule","description":"批量写入心跳计划。每条含时间和任务描述。date 可选，不填则默认今天。","input_schema":{"type":"object","properties":{"date":{"type":"string","description":"YYYY-MM-DD 格式，指定哪天的计划。不填则为今天"},"entries":{"type":"array","items":{"type":"object","properties":{"time":{"type":"string","description":"HH:MM 格式"},"task":{"type":"string","description":"心跳任务描述"}},"required":["time","task"]}}},"required":["entries"]}},
-  {"name":"update_heartbeat_schedule","description":"增删改心跳计划中的条目。","input_schema":{"type":"object","properties":{"changes":{"type":"array","items":{"type":"object","properties":{"id":{"type":"integer","description":"计划条目 ID"},"action":{"type":"string","enum":["add","modify","delete"]},"time":{"type":"string"},"task":{"type":"string"}},"required":["action"]}}},"required":["changes"]}},
-  {"name":"schedule_wakeup","description":"安排未来某个时间点唤醒你的大脑进行思考。同一小时内不会重复安排。","input_schema":{"type":"object","properties":{"datetime":{"type":"string","description":"ISO 格式时间"},"reason":{"type":"string","description":"唤醒原因"}},"required":["datetime","reason"]}},
+  {"name":"sense_city","description":"感知城市环境：温度、食物供给、执政官公告、今日工作分配，一次性获取全部外部信息。","input_schema":{"type":"object","properties":{}}},
+  {"name":"recall","description":"回忆过去的事件和想法。","input_schema":{"type":"object","properties":{"type":{"type":"string","enum":["events","memories"],"description":"回忆类型：events=发生的事件，memories=自己的想法记忆"},"n":{"type":"integer","description":"返回条数"}},"required":["type","n"]}},
+  {"name":"manage_heartbeat","description":"管理心跳计划（工作时间内每10分钟的任务安排）。批量写入或增删改已有条目。","input_schema":{"type":"object","properties":{"date":{"type":"string","description":"YYYY-MM-DD 格式，不填则为今天"},"entries":{"type":"array","description":"批量写入的新条目","items":{"type":"object","properties":{"time":{"type":"string","description":"HH:MM 格式"},"task":{"type":"string"}},"required":["time","task"]}},"changes":{"type":"array","description":"对已有条目的增删改","items":{"type":"object","properties":{"id":{"type":"integer"},"action":{"type":"string","enum":["add","modify","delete"]},"time":{"type":"string"},"task":{"type":"string"}},"required":["action"]}}},"required":[]}},
+  {"name":"schedule_wakeup","description":"安排未来某个时间点唤醒你的大脑进行思考。同一小时内不可重复安排。","input_schema":{"type":"object","properties":{"datetime":{"type":"string","description":"ISO 格式时间"},"reason":{"type":"string","description":"唤醒原因"}},"required":["datetime","reason"]}},
   {"name":"cancel_wakeup","description":"取消一个不再需要的唤醒计划（只能取消 pending 状态的）。","input_schema":{"type":"object","properties":{"id":{"type":"integer","description":"唤醒计划的 ID"}},"required":["id"]}},
-  {"name":"write_narrative","description":"写下你的对外叙事，会被同步到城市日志，其他人可以看到。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
-  {"name":"write_memory","description":"写下私人记忆，只有你自己能看到。设置 persistent=true 表示这是重要的持久记忆，会在每次唤醒时自动回忆。持久记忆用于记录：重要决策、关键人物关系、人生转折、长期目标等不应遗忘的内容。","input_schema":{"type":"object","properties":{"text":{"type":"string"},"persistent":{"type":"boolean","description":"是否为持久记忆。持久记忆每次唤醒都会看到，慎重使用。"}},"required":["text"]}},
-  {"name":"update_soul","description":"更新你的状态。mood/hope/grievance 为数值；body_status 为身体状态的文字描述（正常时为'健康'，异常时描述具体症状如'右腿酸痛，轻微疲劳'）。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance","body_status"]},"value":{"description":"mood/hope/grievance 为整数，body_status 为字符串"}},"required":["field","value"]}}},"required":["updates"]}},
+  {"name":"write_diary","description":"写公开日记。所有人都能看到这本日记，你可以选择记录真实生活，也可以选择性展示——就像人们在社交场合说的话未必是心里话。","input_schema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}},
+  {"name":"write_memory","description":"写私密记忆，只有你自己能看到。设置 persistent=true 表示持久记忆（上限10条，每次唤醒都会看到）。持久记忆仅用于：改变人生方向的决策、不可替代的人物关系、重大转折。满了必须先删再写。","input_schema":{"type":"object","properties":{"text":{"type":"string"},"persistent":{"type":"boolean","description":"是否为持久记忆，上限10条，慎重使用"}},"required":["text"]}},
+  {"name":"delete_memory","description":"删除一条记忆（通过 ID）。可用于清理不再重要的持久记忆，为新记忆腾出空间。","input_schema":{"type":"object","properties":{"id":{"type":"integer","description":"记忆的 ID"}},"required":["id"]}},
+  {"name":"update_soul","description":"更新你的状态。mood/hope/grievance 为 0-100 数值；body_status 为身体状态文字描述（正常时为'健康'）。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance","body_status"]},"value":{"description":"mood/hope/grievance 为整数，body_status 为字符串"}},"required":["field","value"]}}},"required":["updates"]}},
   {"name":"self_destruct","description":"你决定结束自己的生命。这是不可逆的。只有在极端绝望、完全失去活下去的意义时才会使用。","input_schema":{"type":"object","properties":{"last_words":{"type":"string","description":"你的遗言"}},"required":["last_words"]}},
-  {"name":"TodoWrite","description":"追踪你当前的思考步骤。用于防止偏移，确保完成所有计划。","input_schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"}},"required":["content","status","activeForm"]}}},"required":["items"]}},
-  {"name":"compress","description":"手动触发上下文压缩，当对话过长时使用。","input_schema":{"type":"object","properties":{}}}
+  {"name":"TodoWrite","description":"追踪你当前的思考步骤。用于防止偏移，确保完成所有计划。","input_schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"}},"required":["content","status","activeForm"]}}},"required":["items"]}}
 ]`
 
 func loadToolDefs() []llm.ToolDef {
@@ -55,31 +51,20 @@ func loadToolDefs() []llm.ToolDef {
 
 func (e *Engine) buildHandlers(todo *TodoManager) ToolHandlerMap {
 	return ToolHandlerMap{
-		// ── 感知 ──
-		"get_city_temperature":   func(input map[string]any) (string, error) { return e.cityAPI.GetCityTemperature() },
-		"get_food_status":        func(input map[string]any) (string, error) { return e.cityAPI.GetFoodStatus() },
-		"get_city_announcements": func(input map[string]any) (string, error) { return marshalResult(e.cityAPI.GetCityAnnouncements()) },
-		"get_my_work_assignment": func(input map[string]any) (string, error) { return e.cityAPI.GetMyWorkAssignment("") },
-		"get_recent_events":      func(input map[string]any) (string, error) { return marshalResult(e.db.GetRecentEvents(intFromInput(input, "n"))) },
-		"get_memories":           func(input map[string]any) (string, error) { return marshalResult(e.db.GetRecentMemories(intFromInput(input, "n"))) },
-
-		// ── 行动 ──
-		"write_heartbeat_schedule":  func(input map[string]any) (string, error) { return e.handleWriteHeartbeats(input) },
-		"update_heartbeat_schedule": func(input map[string]any) (string, error) { return e.handleUpdateHeartbeats(input) },
-		"schedule_wakeup":           func(input map[string]any) (string, error) { return e.handleScheduleWakeup(input) },
-		"cancel_wakeup":             func(input map[string]any) (string, error) { return e.handleCancelWakeup(input) },
-		"write_narrative":           func(input map[string]any) (string, error) { return e.handleWriteNarrative(input) },
-		"write_memory":              func(input map[string]any) (string, error) { return e.handleWriteMemory(input) },
-		"update_soul":               func(input map[string]any) (string, error) { return e.handleUpdateSoul(input) },
-
-		// ── 终极 ──
+		"sense_city":       func(input map[string]any) (string, error) { return e.handleSenseCity() },
+		"recall":           func(input map[string]any) (string, error) { return e.handleRecall(input) },
+		"manage_heartbeat": func(input map[string]any) (string, error) { return e.handleManageHeartbeat(input) },
+		"schedule_wakeup":  func(input map[string]any) (string, error) { return e.handleScheduleWakeup(input) },
+		"cancel_wakeup":    func(input map[string]any) (string, error) { return e.handleCancelWakeup(input) },
+		"write_diary":      func(input map[string]any) (string, error) { return e.handleWriteDiary(input) },
+		"write_memory":     func(input map[string]any) (string, error) { return e.handleWriteMemory(input) },
+		"delete_memory":    func(input map[string]any) (string, error) { return e.handleDeleteMemory(input) },
+		"update_soul":      func(input map[string]any) (string, error) { return e.handleUpdateSoul(input) },
 		"self_destruct": func(input map[string]any) (string, error) {
 			lastWords, _ := input["last_words"].(string)
 			e.db.InsertNarrative(stripThink(lastWords))
 			return "", ErrSelfDestruct
 		},
-
-		// ── 元工具 ──
 		"TodoWrite": func(input map[string]any) (string, error) {
 			raw, _ := json.Marshal(input["items"])
 			var items []TodoItem
@@ -88,66 +73,112 @@ func (e *Engine) buildHandlers(todo *TodoManager) ToolHandlerMap {
 			}
 			return todo.Update(items)
 		},
-		"compress": func(input map[string]any) (string, error) {
-			return "上下文压缩将在本轮结束后执行", nil
-		},
 	}
 }
 
 // ================================================================
-//  行动类 handler 实现
+//  感知类 handler
 // ================================================================
 
-func (e *Engine) handleWriteHeartbeats(input map[string]any) (string, error) {
-	raw, _ := json.Marshal(input["entries"])
-	var entries []struct {
-		Time string `json:"time"`
-		Task string `json:"task"`
-	}
-	json.Unmarshal(raw, &entries)
+func (e *Engine) handleSenseCity() (string, error) {
+	temp, _ := e.cityAPI.GetCityTemperature()
+	food, _ := e.cityAPI.GetFoodStatus()
+	announcements, _ := e.cityAPI.GetCityAnnouncements()
+	work, _ := e.cityAPI.GetMyWorkAssignment("")
 
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("气温：%s\n", temp))
+	b.WriteString(fmt.Sprintf("食物：%s\n", food))
+	if len(announcements) > 0 {
+		b.WriteString("公告：\n")
+		for _, a := range announcements {
+			b.WriteString(fmt.Sprintf("  - %s\n", a))
+		}
+	}
+	if work != "" {
+		b.WriteString(fmt.Sprintf("工作分配：%s\n", work))
+	}
+	return b.String(), nil
+}
+
+func (e *Engine) handleRecall(input map[string]any) (string, error) {
+	recallType, _ := input["type"].(string)
+	n := intFromInput(input, "n")
+	switch recallType {
+	case "events":
+		return marshalResult(e.db.GetRecentEvents(n))
+	case "memories":
+		return marshalResult(e.db.GetRecentMemories(n))
+	default:
+		return "", fmt.Errorf("无效的回忆类型: %s", recallType)
+	}
+}
+
+// ================================================================
+//  行动类 handler
+// ================================================================
+
+func (e *Engine) handleManageHeartbeat(input map[string]any) (string, error) {
 	date, _ := input["date"].(string)
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
 	}
 
-	var dbEntries []db.HeartbeatEntry
-	for _, en := range entries {
-		dbEntries = append(dbEntries, db.HeartbeatEntry{Time: en.Time, Date: date, Task: en.Task})
-	}
-	if err := e.db.InsertHeartbeats(dbEntries); err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("写入 %d 条心跳计划 (date=%s)", len(entries), date), nil
-}
+	var results []string
 
-func (e *Engine) handleUpdateHeartbeats(input map[string]any) (string, error) {
-	raw, _ := json.Marshal(input["changes"])
-	var changes []struct {
-		ID     int64  `json:"id"`
-		Action string `json:"action"`
-		Time   string `json:"time"`
-		Task   string `json:"task"`
-	}
-	json.Unmarshal(raw, &changes)
-
-	today := time.Now().Format("2006-01-02")
-	var added, modified, deleted int
-
-	for _, c := range changes {
-		switch c.Action {
-		case "add":
-			e.db.InsertHeartbeats([]db.HeartbeatEntry{{Time: c.Time, Date: today, Task: c.Task}})
-			added++
-		case "modify":
-			e.db.ModifyHeartbeat(c.ID, c.Time, c.Task)
-			modified++
-		case "delete":
-			e.db.DeleteHeartbeat(c.ID)
-			deleted++
+	// 批量写入
+	if rawEntries, ok := input["entries"]; ok {
+		raw, _ := json.Marshal(rawEntries)
+		var entries []struct {
+			Time string `json:"time"`
+			Task string `json:"task"`
 		}
+		json.Unmarshal(raw, &entries)
+
+		var dbEntries []db.HeartbeatEntry
+		for _, en := range entries {
+			dbEntries = append(dbEntries, db.HeartbeatEntry{Time: en.Time, Date: date, Task: en.Task})
+		}
+		if err := e.db.InsertHeartbeats(dbEntries); err != nil {
+			return "", err
+		}
+		results = append(results, fmt.Sprintf("写入 %d 条 (date=%s)", len(entries), date))
 	}
-	return fmt.Sprintf("心跳计划已更新: 新增%d 修改%d 删除%d", added, modified, deleted), nil
+
+	// 增删改
+	if rawChanges, ok := input["changes"]; ok {
+		raw, _ := json.Marshal(rawChanges)
+		var changes []struct {
+			ID     int64  `json:"id"`
+			Action string `json:"action"`
+			Time   string `json:"time"`
+			Task   string `json:"task"`
+		}
+		json.Unmarshal(raw, &changes)
+
+		var added, modified, deleted int
+		for _, c := range changes {
+			switch c.Action {
+			case "add":
+				if err := e.db.InsertHeartbeats([]db.HeartbeatEntry{{Time: c.Time, Date: date, Task: c.Task}}); err != nil {
+					return "", err
+				}
+				added++
+			case "modify":
+				e.db.ModifyHeartbeat(c.ID, c.Time, c.Task)
+				modified++
+			case "delete":
+				e.db.DeleteHeartbeat(c.ID)
+				deleted++
+			}
+		}
+		results = append(results, fmt.Sprintf("新增%d 修改%d 删除%d", added, modified, deleted))
+	}
+
+	if len(results) == 0 {
+		return "", fmt.Errorf("必须提供 entries 或 changes")
+	}
+	return "心跳计划已更新: " + strings.Join(results, "；"), nil
 }
 
 func (e *Engine) handleScheduleWakeup(input map[string]any) (string, error) {
@@ -167,40 +198,57 @@ func (e *Engine) handleCancelWakeup(input map[string]any) (string, error) {
 	return fmt.Sprintf("已取消唤醒: id=%d", id), nil
 }
 
-func (e *Engine) handleWriteNarrative(input map[string]any) (string, error) {
+func (e *Engine) handleWriteDiary(input map[string]any) (string, error) {
 	text, _ := input["text"].(string)
 	text = stripThink(text)
 	if err := e.db.InsertNarrative(text); err != nil {
 		return "", err
 	}
 	e.cityAPI.PostNarrative("", text)
-	return "叙事已记录并同步到城市", nil
+	return "日记已写入（公开可见）", nil
 }
+
+const MaxPersistentMemories = 10
 
 func (e *Engine) handleWriteMemory(input map[string]any) (string, error) {
 	text, _ := input["text"].(string)
 	text = stripThink(text)
 	persistent, _ := input["persistent"].(bool)
 	if persistent {
-		return "持久记忆已记录（每次唤醒都会看到）", e.db.InsertMemory(text, "persistent")
+		count, _ := e.db.CountPersistentMemories()
+		if count >= MaxPersistentMemories {
+			return fmt.Sprintf("拒绝：持久记忆已达上限（%d/%d）。请先用 delete_memory 删除不再重要的持久记忆，再写入新的。", count, MaxPersistentMemories), nil
+		}
+		if err := e.db.InsertMemory(text, "persistent"); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("持久记忆已记录（%d/%d）", count+1, MaxPersistentMemories), nil
 	}
 	return "记忆已记录", e.db.InsertMemory(text, "memory")
 }
 
-func stripThink(s string) string {
-	return thinkTagRe.ReplaceAllString(s, "")
+func (e *Engine) handleDeleteMemory(input map[string]any) (string, error) {
+	id := int64(intFromInput(input, "id"))
+	if err := e.db.DeleteMemory(id); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("记忆 id=%d 已删除", id), nil
 }
 
 func (e *Engine) handleUpdateSoul(input map[string]any) (string, error) {
 	raw, _ := json.Marshal(input["updates"])
 	var updates []db.SoulUpdate
 	json.Unmarshal(raw, &updates)
-	return "情绪已更新", e.db.UpdateSoul(updates)
+	return "状态已更新", e.db.UpdateSoul(updates)
 }
 
 // ================================================================
 //  辅助
 // ================================================================
+
+func stripThink(s string) string {
+	return thinkTagRe.ReplaceAllString(s, "")
+}
 
 func intFromInput(input map[string]any, key string) int {
 	switch v := input[key].(type) {

@@ -120,15 +120,11 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 		// ── 工具分发 ──
 		log.Printf("│ 🔧 工具调用: %d 个", len(resp.Message.ToolCalls))
 		usedTodo := false
-		manualCompress := false
 
 		for i, call := range resp.Message.ToolCalls {
 			name := call.Function.Name
 			args := call.Function.Arguments
 
-			if name == "compress" {
-				manualCompress = true
-			}
 			if name == "TodoWrite" {
 				usedTodo = true
 			}
@@ -185,12 +181,6 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 				Role:    "user",
 				Content: "<reminder>你还有未完成的 todo 步骤，请检查并更新。</reminder>",
 			})
-		}
-
-		// ── 手动压缩 ──
-		if manualCompress {
-			log.Println("  ⚙ 手动压缩触发")
-			messages = autoCompact(cfg.Client, messages)
 		}
 	}
 

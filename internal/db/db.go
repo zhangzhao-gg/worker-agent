@@ -116,6 +116,8 @@ func NewReadOnly(dbPath string) (*Database, error) {
 
 func (d *Database) migrate() {
 	d.db.Exec("ALTER TABLE soul ADD COLUMN body_status TEXT DEFAULT '健康'")
+	d.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_heartbeat_time_date ON heartbeat_schedule(time, date)")
+	d.db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_wakeup_hour ON wakeup_schedule(substr(datetime, 1, 13)) WHERE status = 'pending'")
 }
 
 func (d *Database) Close() error {
@@ -260,14 +262,25 @@ func (d *Database) InsertHeartbeats(entries []HeartbeatEntry) error {
 	}
 	defer tx.Rollback()
 
-	stmt, err := tx.Prepare("INSERT INTO heartbeat_schedule (time, date, task) VALUES (?, ?, ?)")
+	checkStmt, err := tx.Prepare("SELECT COUNT(*) FROM heartbeat_schedule WHERE time = ? AND date = ?")
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer checkStmt.Close()
+
+	insertStmt, err := tx.Prepare("INSERT INTO heartbeat_schedule (time, date, task) VALUES (?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer insertStmt.Close()
 
 	for _, e := range entries {
-		if _, err := stmt.Exec(e.Time, e.Date, e.Task); err != nil {
+		var count int
+		checkStmt.QueryRow(e.Time, e.Date).Scan(&count)
+		if count > 0 {
+			return fmt.Errorf("时间冲突: %s %s 已有心跳计划，不可重复安排", e.Date, e.Time)
+		}
+		if _, err := insertStmt.Exec(e.Time, e.Date, e.Task); err != nil {
 			return err
 		}
 	}
@@ -348,6 +361,18 @@ func (d *Database) InsertWakeup(datetime string, reason string) error {
 	if t.Before(time.Now()) {
 		return fmt.Errorf("拒绝过去的时间: %s", datetime)
 	}
+
+	hourStart := t.Truncate(time.Hour).Format(time.RFC3339)
+	hourEnd := t.Truncate(time.Hour).Add(time.Hour).Format(time.RFC3339)
+	var count int
+	d.db.QueryRow(
+		"SELECT COUNT(*) FROM wakeup_schedule WHERE status = 'pending' AND datetime >= ? AND datetime < ?",
+		hourStart, hourEnd,
+	).Scan(&count)
+	if count > 0 {
+		return fmt.Errorf("该小时已有唤醒计划，拒绝重复安排: %s", datetime)
+	}
+
 	_, err = d.db.Exec("INSERT INTO wakeup_schedule (datetime, reason) VALUES (?, ?)", datetime, reason)
 	return err
 }
@@ -503,6 +528,12 @@ func (d *Database) GetPersistentMemories() ([]Memory, error) {
 		memories = append(memories, m)
 	}
 	return memories, rows.Err()
+}
+
+func (d *Database) CountPersistentMemories() (int, error) {
+	var count int
+	err := d.db.QueryRow("SELECT COUNT(*) FROM memories WHERE type = 'persistent'").Scan(&count)
+	return count, err
 }
 
 func (d *Database) DeleteMemory(id int64) error {
