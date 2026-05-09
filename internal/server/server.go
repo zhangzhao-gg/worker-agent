@@ -17,12 +17,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"worker-agent/internal/city"
 	"worker-agent/internal/db"
 	"worker-agent/internal/engine"
 	"worker-agent/internal/llm"
+	"worker-agent/internal/msgrouter"
 	"worker-agent/internal/worker"
 )
 
@@ -34,17 +36,19 @@ type Server struct {
 	dataDir   string
 	cityAPI   *city.CityAPI
 	llmClient llm.Client
+	msgRouter *msgrouter.MessageRouter
 	workers   map[string]*runningWorker
 	mu        sync.RWMutex
 }
 
 type runningWorker struct {
-	Name     string             `json:"name"`
-	Status   string             `json:"status"`
-	DBPath   string             `json:"db_path"`
-	database *db.Database
-	wakeupCh chan<- worker.WakeupSignal
-	cancel   context.CancelFunc
+	Name      string             `json:"name"`
+	Status    string             `json:"status"`
+	DBPath    string             `json:"db_path"`
+	database  *db.Database
+	wakeupCh  chan<- worker.WakeupSignal
+	reasoning *atomic.Bool
+	cancel    context.CancelFunc
 }
 
 // ================================================================
@@ -73,12 +77,45 @@ type workerInfo struct {
 
 func New(dataDir string, cityAPI *city.CityAPI, llmClient llm.Client) *Server {
 	os.MkdirAll(dataDir, 0755)
-	return &Server{
+
+	msgDBPath := filepath.Join(dataDir, "_messages.db")
+	router, err := msgrouter.New(msgDBPath)
+	if err != nil {
+		log.Fatalf("[server] 创建消息路由器失败: %v", err)
+	}
+
+	s := &Server{
 		dataDir:   dataDir,
 		cityAPI:   cityAPI,
 		llmClient: llmClient,
+		msgRouter: router,
 		workers:   make(map[string]*runningWorker),
 	}
+
+	router.SetWakeupFn(func(workerName string, signal msgrouter.ConversationSignal) bool {
+		s.mu.RLock()
+		rw, exists := s.workers[sanitizeName(workerName)]
+		s.mu.RUnlock()
+		if !exists {
+			return false
+		}
+		ws := worker.WakeupSignal{
+			Trigger: "conversation",
+			Conversation: &worker.ConversationContext{
+				ConversationID: signal.ConversationID,
+				SenderName:     signal.SenderName,
+				Content:        signal.Content,
+			},
+		}
+		select {
+		case rw.wakeupCh <- ws:
+			return true
+		default:
+			return false
+		}
+	})
+
+	return s
 }
 
 // ================================================================
@@ -374,16 +411,18 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) startWorker(name string, dbPath string, database *db.Database) {
 	log.Printf("[server] startWorker: name=%s, llmClient=%v", name, s.llmClient != nil)
 	ctx, cancel := context.WithCancel(context.Background())
-	eng := engine.New(database, s.cityAPI, s.llmClient)
+	eng := engine.New(database, s.cityAPI, s.llmClient, s.msgRouter, name)
 	wakeupCh := make(chan worker.WakeupSignal, 16)
+	reasoning := &atomic.Bool{}
 
 	rw := &runningWorker{
-		Name:     name,
-		Status:   "running",
-		DBPath:   dbPath,
-		database: database,
-		wakeupCh: wakeupCh,
-		cancel:   cancel,
+		Name:      name,
+		Status:    "running",
+		DBPath:    dbPath,
+		database:  database,
+		wakeupCh:  wakeupCh,
+		reasoning: reasoning,
+		cancel:    cancel,
 	}
 
 	s.mu.Lock()
@@ -393,7 +432,7 @@ func (s *Server) startWorker(name string, dbPath string, database *db.Database) 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go worker.RunHeartbeat(ctx, database, s.cityAPI, s.llmClient, name, wakeupCh, &wg)
-	go worker.RunWakeup(ctx, database, eng, wakeupCh, &wg)
+	go worker.RunWakeup(ctx, database, eng, wakeupCh, &wg, reasoning)
 
 	// 监控协程退出
 	go func() {

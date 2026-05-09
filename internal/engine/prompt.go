@@ -95,6 +95,30 @@ func buildSystemPrompt(ctx RunContext) string {
 	)
 }
 
+func buildConversationPrompt(ctx RunContext, senderName string) string {
+	s := ctx.Soul
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("你是 %s，%s。\n%s\n\n", s.Name, s.Occupation, s.Background))
+	b.WriteString(fmt.Sprintf("你的性格：%s\n", s.Personality))
+	b.WriteString(fmt.Sprintf("你的说话方式：%s\n\n", s.SpeechStyle))
+
+	if len(ctx.PersistentMemories) > 0 {
+		b.WriteString("你的持久记忆：\n")
+		for _, m := range ctx.PersistentMemories {
+			b.WriteString(fmt.Sprintf("- %s\n", m.Content))
+		}
+		b.WriteString("\n")
+	}
+
+	b.WriteString(fmt.Sprintf(`%s 正在和你说话。
+用 reply_message 回复后对方可能继续说话，用 end_conversation 说最后一句并结束。
+像真人一样对话——该回就回，该结束就结束，不要刻意延续话题。
+你可以用 recall 回忆相关记忆，用 write_memory 记下重要对话内容。`, senderName))
+
+	return b.String()
+}
+
 func buildInitialMessage(trigger string, ctx RunContext) string {
 	var b strings.Builder
 

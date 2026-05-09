@@ -35,6 +35,7 @@ var toolsJSON = `[
   {"name":"write_memory","description":"写私密记忆，只有你自己能看到。设置 persistent=true 表示持久记忆（上限10条，每次唤醒都会看到）。持久记忆仅用于：改变人生方向的决策、不可替代的人物关系、重大转折。满了必须先删再写。","input_schema":{"type":"object","properties":{"text":{"type":"string"},"persistent":{"type":"boolean","description":"是否为持久记忆，上限10条，慎重使用"}},"required":["text"]}},
   {"name":"delete_memory","description":"删除一条记忆（通过 ID）。可用于清理不再重要的持久记忆，为新记忆腾出空间。","input_schema":{"type":"object","properties":{"id":{"type":"integer","description":"记忆的 ID"}},"required":["id"]}},
   {"name":"update_soul","description":"更新你的状态。mood/hope/grievance 为 0-100 数值；body_status 为身体状态文字描述（正常时为'健康'）。","input_schema":{"type":"object","properties":{"updates":{"type":"array","items":{"type":"object","properties":{"field":{"type":"string","enum":["mood","hope","grievance","body_status"]},"value":{"description":"mood/hope/grievance 为整数，body_status 为字符串"}},"required":["field","value"]}}},"required":["updates"]}},
+  {"name":"send_message","description":"向另一个工人说话并等待回复。首次不传 conversation_id 发起新对话；对方回复后若未结束，可传回 conversation_id 继续聊。同一对话最多 30 轮。","input_schema":{"type":"object","properties":{"to":{"type":"string","description":"目标工人名称"},"content":{"type":"string","description":"你想说的话"},"conversation_id":{"type":"string","description":"续接已有对话时传入，首次发起不传"}},"required":["to","content"]}},
   {"name":"self_destruct","description":"你决定结束自己的生命。这是不可逆的。只有在极端绝望、完全失去活下去的意义时才会使用。","input_schema":{"type":"object","properties":{"last_words":{"type":"string","description":"你的遗言"}},"required":["last_words"]}},
   {"name":"TodoWrite","description":"追踪你当前的思考步骤。用于防止偏移，确保完成所有计划。","input_schema":{"type":"object","properties":{"items":{"type":"array","items":{"type":"object","properties":{"content":{"type":"string"},"status":{"type":"string","enum":["pending","in_progress","completed"]},"activeForm":{"type":"string"}},"required":["content","status","activeForm"]}}},"required":["items"]}}
 ]`
@@ -60,6 +61,23 @@ func (e *Engine) buildHandlers(todo *TodoManager) ToolHandlerMap {
 		"write_memory":     func(input map[string]any) (string, error) { return e.handleWriteMemory(input) },
 		"delete_memory":    func(input map[string]any) (string, error) { return e.handleDeleteMemory(input) },
 		"update_soul":      func(input map[string]any) (string, error) { return e.handleUpdateSoul(input) },
+		"send_message": func(input map[string]any) (string, error) {
+			if e.router == nil {
+				return "发送失败：消息系统未启用", nil
+			}
+			to, _ := input["to"].(string)
+			content, _ := input["content"].(string)
+			convID, _ := input["conversation_id"].(string)
+			content = stripThink(content)
+			payload, err := e.router.SendAndWait(e.workerName, to, content, convID, 120*time.Second)
+			if err != nil {
+				return fmt.Sprintf("发送失败：%s", err.Error()), nil
+			}
+			if payload.Ended {
+				return fmt.Sprintf("%s 回复你：「%s」（对方结束了对话）", to, payload.Content), nil
+			}
+			return fmt.Sprintf("%s 回复你：「%s」（对方想继续聊，conversation_id=%s）", to, payload.Content, payload.ConversationID), nil
+		},
 		"self_destruct": func(input map[string]any) (string, error) {
 			lastWords, _ := input["last_words"].(string)
 			e.db.InsertNarrative(stripThink(lastWords))

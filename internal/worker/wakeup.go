@@ -20,29 +20,49 @@ import (
 )
 
 // ================================================================
-//  Per-worker 推理锁
-// ================================================================
-
-var reasoning atomic.Bool
-
-func IsReasoning() bool {
-	return reasoning.Load()
-}
-
-// ================================================================
 //  唤醒调度协程
 // ================================================================
 
-func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, wakeupCh <-chan WakeupSignal, wg *sync.WaitGroup) {
+func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, wakeupCh <-chan WakeupSignal, wg *sync.WaitGroup, reasoning *atomic.Bool) {
 	defer wg.Done()
 	log.Println("[唤醒] 协程启动")
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
+	var pendingConvs []*ConversationContext
+
+	drainPending := func() {
+		for len(pendingConvs) > 0 {
+			conv := pendingConvs[0]
+			pendingConvs = pendingConvs[1:]
+			log.Printf("[唤醒] 处理排队对话: from=%s, conv=%s", conv.SenderName, conv.ConversationID)
+			reasoning.Store(true)
+			if err := handleConversationWakeup(database, eng, conv); err != nil {
+				log.Printf("[唤醒] 对话处理失败: %v", err)
+			}
+			reasoning.Store(false)
+		}
+	}
+
 	for {
 		select {
 		case signal := <-wakeupCh:
+			if signal.Conversation != nil {
+				log.Printf("[唤醒] 收到对话信号: from=%s, conv=%s", signal.Conversation.SenderName, signal.Conversation.ConversationID)
+				if reasoning.Load() {
+					log.Println("[唤醒] 正在推理中，对话排队等待")
+					pendingConvs = append(pendingConvs, signal.Conversation)
+					continue
+				}
+				reasoning.Store(true)
+				if err := handleConversationWakeup(database, eng, signal.Conversation); err != nil {
+					log.Printf("[唤醒] 对话处理失败: %v", err)
+				}
+				reasoning.Store(false)
+				continue
+			}
+
 			log.Printf("[唤醒] 收到紧急信号: trigger=%s", signal.Trigger)
 			if reasoning.Load() {
 				log.Println("[唤醒] 正在推理中，紧急信号暂存为事件")
@@ -58,20 +78,21 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 				log.Printf("[唤醒] 紧急唤醒失败: %v", err)
 			}
 			reasoning.Store(false)
+			drainPending()
 
 		case <-ticker.C:
-			now := time.Now().Format(time.RFC3339)
-			log.Printf("[唤醒] 定时扫描 pending wakeups, now=%s", now)
 			if reasoning.Load() {
-				log.Println("[唤醒] 正在推理中，跳过本轮扫描")
 				continue
 			}
+
+			drainPending()
+
+			now := time.Now().Format(time.RFC3339)
 			entries, err := database.GetPendingWakeups(now)
 			if err != nil {
 				log.Printf("[唤醒] 查询计划失败: %v", err)
 				continue
 			}
-			log.Printf("[唤醒] 扫描到 %d 条待处理唤醒", len(entries))
 			for _, entry := range entries {
 				log.Printf("[唤醒] 触发唤醒: id=%d, datetime=%s, reason=%s", entry.ID, entry.Datetime, entry.Reason)
 				reasoning.Store(true)
@@ -87,11 +108,29 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 				reasoning.Store(false)
 			}
 
+			drainPending()
+
 		case <-ctx.Done():
 			log.Println("[唤醒] 协程退出")
 			return
 		}
 	}
+}
+
+func handleConversationWakeup(database *db.Database, eng *engine.Engine, conv *ConversationContext) error {
+	soul, err := database.GetSoul()
+	if err != nil {
+		return err
+	}
+
+	persistentMemories, _ := database.GetPersistentMemories()
+
+	ctx := engine.RunContext{
+		Soul:               soul,
+		PersistentMemories: persistentMemories,
+	}
+
+	return eng.RunConversation(conv.ConversationID, conv.SenderName, conv.Content, ctx)
 }
 
 func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, news string, reason string) error {
@@ -102,7 +141,6 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 		log.Printf("[唤醒] 读取 soul 失败: %v", err)
 		return err
 	}
-	log.Printf("[唤醒] soul 加载成功: name=%s", soul.Name)
 
 	persistentMemories, _ := database.GetPersistentMemories()
 	events, _ := database.GetUnprocessedEvents()
@@ -115,7 +153,6 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 	yesterday := now.AddDate(0, 0, -1).Format("2006-01-02")
 	tomorrow := now.AddDate(0, 0, 1).Format("2006-01-02")
 	heartbeats, _ := database.GetHeartbeatsByDateRange(yesterday, tomorrow)
-	log.Printf("[唤醒] 上下文: 持久记忆=%d, 未处理事件=%d, 唤醒记录=%d, 心跳=%d", len(persistentMemories), len(events), len(wakeups), len(heartbeats))
 
 	ctx := engine.RunContext{
 		Soul:               soul,
@@ -127,21 +164,16 @@ func handleWakeup(database *db.Database, eng *engine.Engine, trigger string, new
 		News:               news,
 	}
 
-	log.Println("[唤醒] 调用推理引擎 eng.Run()...")
 	if err := eng.Run(trigger, ctx); err != nil {
-		log.Printf("[唤醒] 推理引擎错误: %v", err)
 		return err
 	}
-	log.Println("[唤醒] 推理引擎执行完毕")
 
 	database.MarkEventsProcessed()
 
 	hasPending, _ := database.HasPendingWakeups()
-	log.Printf("[唤醒] 检查后续唤醒: hasPending=%v", hasPending)
 	if !hasPending {
 		tomorrow := time.Now().Add(24 * time.Hour).Truncate(24 * time.Hour).Add(8 * time.Hour)
 		database.InsertWakeup(tomorrow.Format(time.RFC3339), "兜底唤醒")
-		log.Printf("[唤醒] 补插兜底唤醒: %s", tomorrow.Format(time.RFC3339))
 	}
 	return nil
 }

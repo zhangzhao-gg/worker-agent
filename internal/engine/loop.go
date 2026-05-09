@@ -40,12 +40,13 @@ type ToolHandlerMap map[string]ToolHandler
 // ================================================================
 
 type loopConfig struct {
-	Client   llm.Client
-	Prompt   string
-	Tools    []llm.ToolDef
-	Handlers ToolHandlerMap
-	Todo     *TodoManager
-	LogFn    LogFunc
+	Client    llm.Client
+	Prompt    string
+	Tools     []llm.ToolDef
+	Handlers  ToolHandlerMap
+	Todo      *TodoManager
+	LogFn     LogFunc
+	MaxRounds int
 }
 
 // ================================================================
@@ -67,7 +68,12 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 	roundsWithoutTodo := 0
 	reviewed := false
 
-	for round := 0; round < MaxAgentRounds; round++ {
+	maxRounds := cfg.MaxRounds
+	if maxRounds == 0 {
+		maxRounds = MaxAgentRounds
+	}
+
+	for round := 0; round < maxRounds; round++ {
 		// ── 压缩管线 ──
 		microcompact(messages)
 		tokens := estimateTokens(messages)
@@ -146,6 +152,12 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 					cfg.LogFn(round+1, "self_destruct", name)
 					return ErrSelfDestruct
 				}
+				if errors.Is(err, ErrConversationDone) {
+					log.Println("│       ✔ 对话回复完成")
+					log.Println("└──────────────────────────────────────────────────────────")
+					cfg.LogFn(round+1, "conversation_done", name)
+					return nil
+				}
 				if err != nil {
 					output = "Error: " + err.Error()
 					log.Printf("│       ✘ %s", truncate(output, 150))
@@ -185,9 +197,9 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 	}
 
 	log.Println("╔══════════════════════════════════════════════════════════")
-	log.Printf("║ ✘ AGENT LOOP 超限  |  达到最大轮次 %d", MaxAgentRounds)
+	log.Printf("║ ✘ AGENT LOOP 超限  |  达到最大轮次 %d", maxRounds)
 	log.Println("╚══════════════════════════════════════════════════════════")
-	return fmt.Errorf("推理达到最大轮次 %d", MaxAgentRounds)
+	return fmt.Errorf("推理达到最大轮次 %d", maxRounds)
 }
 
 func truncate(s string, n int) string {

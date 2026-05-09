@@ -25,8 +25,15 @@ import (
 // ================================================================
 
 type WakeupSignal struct {
-	Trigger string
-	News    string
+	Trigger      string
+	News         string
+	Conversation *ConversationContext
+}
+
+type ConversationContext struct {
+	ConversationID string
+	SenderName     string
+	Content        string
 }
 
 // ================================================================
