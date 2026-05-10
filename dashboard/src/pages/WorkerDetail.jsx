@@ -342,11 +342,40 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
     return 'resting'
   }, [worker.status, currentActivity])
 
+  // ------ 氛围：色温 + 时间段 ------
+  const ambience = useMemo(() => {
+    const mood = Math.min(100, Math.max(0, soul.mood || 50))
+    const hour = new Date().getHours()
+    let timeOfDay = 'day'
+    if (hour >= 5 && hour < 8) timeOfDay = 'dawn'
+    else if (hour >= 8 && hour < 17) timeOfDay = 'day'
+    else if (hour >= 17 && hour < 20) timeOfDay = 'dusk'
+    else timeOfDay = 'night'
+
+    const warmth = mood / 100
+    // mood 低 → 冷灰偏暗；mood 高 → 暖黄明亮
+    const surfaceH = Math.round(30 + warmth * 10)
+    const surfaceS = Math.round(5 + warmth * 25)
+    const surfaceL = Math.round(85 + warmth * 8)
+    const surface = `hsl(${surfaceH}, ${surfaceS}%, ${surfaceL}%)`
+
+    const paperH = Math.round(33 + warmth * 8)
+    const paperS = Math.round(15 + warmth * 30)
+    const paperL = Math.round(65 + warmth * 12)
+    const paper = `hsl(${paperH}, ${paperS}%, ${paperL}%)`
+
+    const shadowAlpha = 0.12 + (1 - warmth) * 0.12
+    const shadow = `rgba(26, 20, 16, ${shadowAlpha.toFixed(2)})`
+
+    return { surface, paper, shadow, timeOfDay }
+  }, [soul.mood])
+
   const [isThinking, setIsThinking] = useState(false)
   const [thinkingStarted, setThinkingStarted] = useState(false)
   const [thinkingSteps, setThinkingSteps] = useState([])
   const [thinkingResult, setThinkingResult] = useState(null)
   const [manualWakeup, setManualWakeup] = useState(false)
+  const [shaking, setShaking] = useState(false)
   const baselineIdRef = useRef(0)
   const [detailModal, setDetailModal] = useState(null)
 
@@ -463,11 +492,24 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
       setThinkingStarted(false)
       setThinkingSteps([])
       setThinkingResult(null)
+      setShaking(true)
+      setTimeout(() => setShaking(false), 500)
     } catch (e) { setWakeupMsg('失败: ' + e.message); setTimeout(() => setWakeupMsg(''), 3000) }
   }
 
   return (
-    <div className={styles.visitorContainer}>
+    <div
+      className={styles.visitorContainer}
+      data-time={ambience.timeOfDay}
+      style={{
+        '--amb-surface': ambience.surface,
+        '--amb-paper': ambience.paper,
+        '--amb-shadow': ambience.shadow,
+      }}
+    >
+      {/* 窗户光效 */}
+      <div className={styles.windowLight} data-time={ambience.timeOfDay} />
+
       {/* 隐蔽管理员入口 */}
       <button className={styles.lockIcon} onClick={() => setShowLockModal(true)} title="管理员">
         &#x1f512;
@@ -498,153 +540,161 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
       {/* 返回按钮 */}
       <button className={styles.visitorBack} onClick={onBack}>&larr; 返回</button>
 
-      {/* 主卡片 */}
-      <div className={styles.visitorCard}>
-        {/* 头像 + 身份 */}
-        <div className={styles.visitorIdentity}>
+      {/* 桌面 */}
+      <div className={`${styles.desk} ${isThinking ? styles.deskDimmed : ''} ${shaking ? styles.deskShake : ''}`}>
+        {/* 身份纸片 */}
+        <div className={`${styles.paper} ${styles.identityPaper}`} style={{ transform: 'rotate(-3deg) translate(-6px, 4px)' }}>
           <div className={styles.visitorAvatar}>
             {soul.avatar ? <img src={soul.avatar} className={styles.avatarImg} /> : (soul.name || name)[0]?.toUpperCase()}
           </div>
-          <h1 className={styles.visitorName}>{soul.name || name}</h1>
-          <div className={styles.visitorOccupation}>{soul.occupation}</div>
-        </div>
-
-        {/* 当前状态行 */}
-        <div className={styles.visitorStatus}>
-          <span className={`${styles.statusDot} ${styles[`dot_${statusType}`]}`} />
-          <span className={styles.statusText}>
-            {currentActivity ? currentActivity : '休息中'}
-          </span>
-          {statusType === 'active' && <span className={styles.ellipsis} />}
-        </div>
-
-        {/* 下一步计划 */}
-        {nextPlan && (
-          <div className={styles.visitorNext}>
-            {nextPlan.type === 'upcoming'
-              ? `${nextPlan.minutes} 分钟后要去 ${nextPlan.task}`
-              : `休息中，明日 ${nextPlan.time} 起床`
-            }
+          <div className={styles.identityInfo}>
+            <h1 className={styles.visitorName}>{soul.name || name}</h1>
+            <div className={styles.visitorOccupation}>{soul.occupation}</div>
+            <div className={styles.visitorMoodNarrative}>{moodNarrative(soul)}</div>
           </div>
-        )}
+        </div>
 
-        {/* 信息卡片区 */}
-        <div className={styles.visitorInfoGrid}>
-          {/* 最近日记 */}
-          <div className={styles.visitorInfoItem} onClick={() => narratives.length && setDetailModal({ title: '最近日记', content: narratives[0].content })}>
-            <div className={styles.visitorInfoLabel}>最近日记</div>
-            <div className={styles.visitorInfoContent}>
-              {narratives.length ? narratives[0].content : '暂无日记'}
+        {/* 状态纸片 */}
+        <div className={`${styles.paper} ${styles.statusPaper}`} style={{ transform: 'rotate(2.5deg) translate(8px, 5px)' }}>
+          <div className={styles.visitorStatus}>
+            <span className={`${styles.candle} ${styles[`candle_${statusType}`]}`}>
+              {statusType === 'thinking' ? '✎' : '🕯'}
+            </span>
+            <span className={styles.statusText}>
+              {currentActivity ? currentActivity : '休息中'}
+            </span>
+            {statusType === 'active' && <span className={styles.ellipsis} />}
+          </div>
+          {nextPlan && (
+            <div className={styles.visitorNext}>
+              {nextPlan.type === 'upcoming'
+                ? `${nextPlan.minutes} 分钟后 — ${nextPlan.task}`
+                : `休息中，明日 ${nextPlan.time} 起床`
+              }
             </div>
-            {narratives.length > 0 && <span className={styles.expandHint}>点击展开</span>}
-          </div>
-
-          {/* 最近见闻 */}
-          <div className={styles.visitorInfoItem} onClick={() => events.length && setDetailModal({ title: '最近见闻', content: events[0].content })}>
-            <div className={styles.visitorInfoLabel}>最近见闻</div>
-            <div className={styles.visitorInfoContent}>
-              {events.length ? events[0].content : '暂无见闻'}
+          )}
+          {nextWakeup && (
+            <div className={styles.visitorWakeupInfo}>
+              <span className={styles.visitorInfoLabel}>下次思考</span>
+              <span>{fmtTime(nextWakeup.datetime)} — {nextWakeup.reason}</span>
             </div>
-            {events.length > 0 && <span className={styles.expandHint}>点击展开</span>}
-          </div>
+          )}
         </div>
 
-        {/* 详情模态框 */}
-        {detailModal && (
-          <div className={styles.lockOverlay} onClick={() => setDetailModal(null)}>
-            <div className={styles.detailModal} onClick={e => e.stopPropagation()}>
-              <div className={styles.lockModalTitle}>{detailModal.title}</div>
-              <div className={styles.detailContent}>{detailModal.content}</div>
-              <button className={styles.btn} onClick={() => setDetailModal(null)}>关闭</button>
-            </div>
-          </div>
-        )}
-
-        {/* 下次思考计划 */}
-        {nextWakeup && (
-          <div className={styles.visitorWakeupInfo}>
-            <span className={styles.visitorInfoLabel}>下次思考</span>
-            <span>{fmtTime(nextWakeup.datetime)} - {nextWakeup.reason}</span>
-          </div>
-        )}
-
-        {/* 情绪旁白 */}
-        <div className={styles.visitorMoodNarrative}>
-          {moodNarrative(soul)}
+        {/* 日记纸片 */}
+        <div className={`${styles.paper} ${styles.diaryPaper}`} style={{ transform: 'rotate(2deg) translate(4px, -6px)' }} onClick={() => narratives.length && setDetailModal({ title: '日记', content: narratives[0].content })}>
+          <span className={styles.paperLabel}>日记</span>
+          {narratives.length ? (
+            <>
+              <div className={styles.diaryContent}>{narratives[0].content}</div>
+              <div className={styles.diaryDate}>{fmtTime(narratives[0].timestamp)}</div>
+            </>
+          ) : (
+            <div className={styles.empty}>还没有写过日记</div>
+          )}
         </div>
 
-        {/* 了解更多 */}
-        <button className={styles.visitorMoreBtn} onClick={onShowDetail}>
-          了解更多关于 {soul.name || name} 的信息 &rarr;
-        </button>
-
-        {/* 唤醒输入 */}
-        <div className={styles.visitorWakeupAction}>
-          <input
-            value={wakeupReason}
-            onChange={e => setWakeupReason(e.target.value)}
-            placeholder="说点什么唤醒 TA..."
-            className={styles.visitorWakeupInput}
-            onKeyDown={e => e.key === 'Enter' && doVisitorWakeup()}
-            disabled={isThinking}
-          />
-          <button onClick={doVisitorWakeup} className={styles.btn} disabled={isThinking}>
-            {isThinking ? '思考中' : '唤醒'}
-          </button>
+        {/* 见闻纸片 */}
+        <div className={`${styles.paper} ${styles.eventsPaper}`} style={{ transform: 'rotate(-3.5deg) translate(-8px, 5px)' }}>
+          <span className={styles.paperLabel}>最近见闻</span>
+          {events.length ? (
+            events.slice(0, 3).map((ev, i) => (
+              <div key={ev.id || i} className={styles.eventItem} onClick={() => setDetailModal({ title: '见闻', content: ev.content })}>
+                {ev.content.length > 60 ? ev.content.slice(0, 60) + '...' : ev.content}
+              </div>
+            ))
+          ) : (
+            <div className={styles.empty}>暂无见闻</div>
+          )}
         </div>
-        {wakeupMsg && <div className={styles.msg}>{wakeupMsg}</div>}
 
-        {/* 思考面板 */}
-        {(isThinking || thinkingResult) && (
-          <div className={styles.thinkingPanel}>
-            {isThinking ? (
-              <>
-                <div className={styles.thinkingHeader}>
-                  <span className={`${styles.statusDot} ${styles.dot_thinking}`} />
-                  {thinkingStarted ? (
-                    <span className={styles.waveText}>
-                      {'正在思考'.split('').map((ch, i) => (
-                        <span key={i} style={{ animationDelay: `${i * 0.15}s` }}>{ch}</span>
-                      ))}
-                    </span>
-                  ) : <span>等待唤醒...</span>}
-                </div>
-                <div className={styles.thinkingSteps}>
-                  {thinkingSteps.map((step, i) => (
-                    <div key={i} className={`${styles.thinkingStep} ${i === thinkingSteps.length - 1 ? styles.stepActive : styles.stepDone}`}>
-                      {step}
-                    </div>
-                  ))}
-                  <div className={styles.thinkingCursor} />
-                </div>
-              </>
-            ) : thinkingResult && (
-              <>
-                <div className={styles.thinkingHeader}>
-                  <span className={styles.statusDot} style={{ background: '#22c55e' }} />
-                  <span>思考完成</span>
-                </div>
-                <div className={styles.thinkingResultBody}>
-                  {thinkingResult.narrative && (
-                    <div className={styles.resultItem}>
-                      <span className={styles.resultLabel}>写了日记</span>
-                      <p className={styles.resultText}>{thinkingResult.narrative}</p>
-                    </div>
-                  )}
-                  {thinkingResult.memory && (
-                    <div className={styles.resultItem}>
-                      <span className={styles.resultLabel}>内心想法</span>
-                      <p className={styles.resultText}>{thinkingResult.memory}</p>
-                    </div>
-                  )}
-                  {thinkingResult.moodChange && <div className={styles.resultMeta}>情绪有所变化</div>}
-                  {thinkingResult.nextWakeup && <div className={styles.resultMeta}>安排了下次思考：{thinkingResult.nextWakeup}</div>}
-                </div>
-              </>
-            )}
+        {/* 唤醒区 */}
+        <div className={`${styles.paper} ${styles.wakeupPaper}`} style={{ transform: 'rotate(-2deg) translate(-5px, -3px)' }}>
+          <span className={styles.paperLabel}>轻敲桌面唤醒 TA</span>
+          <div className={styles.visitorWakeupAction}>
+            <input
+              value={wakeupReason}
+              onChange={e => setWakeupReason(e.target.value)}
+              placeholder="说点什么..."
+              className={styles.visitorWakeupInput}
+              onKeyDown={e => e.key === 'Enter' && doVisitorWakeup()}
+              disabled={isThinking}
+            />
+            <button onClick={doVisitorWakeup} className={styles.btn} disabled={isThinking}>
+              {isThinking ? '思考中' : '唤醒'}
+            </button>
           </div>
-        )}
+          {wakeupMsg && <div className={styles.msg}>{wakeupMsg}</div>}
+        </div>
+
       </div>
+
+      {/* 思考面板 — 浮于桌面之上 */}
+      {(isThinking || thinkingResult) && (
+        <div className={styles.thinkingPanel}>
+          {isThinking ? (
+            <>
+              <div className={styles.thinkingHeader}>
+                <span className={`${styles.statusDot} ${styles.dot_thinking}`} />
+                {thinkingStarted ? (
+                  <span className={styles.waveText}>
+                    {'正在思考'.split('').map((ch, i) => (
+                      <span key={i} style={{ animationDelay: `${i * 0.15}s` }}>{ch}</span>
+                    ))}
+                  </span>
+                ) : <span>等待唤醒...</span>}
+              </div>
+              <div className={styles.thinkingSteps}>
+                {thinkingSteps.map((step, i) => (
+                  <div key={i} className={`${styles.thinkingStep} ${i === thinkingSteps.length - 1 ? styles.stepActive : styles.stepDone}`}>
+                    {step}
+                  </div>
+                ))}
+                <div className={styles.thinkingCursor} />
+              </div>
+            </>
+          ) : thinkingResult && (
+            <>
+              <div className={styles.thinkingHeader}>
+                <span className={styles.statusDot} style={{ background: '#22c55e' }} />
+                <span>思考完成</span>
+              </div>
+              <div className={styles.thinkingResultBody}>
+                {thinkingResult.narrative && (
+                  <div className={styles.resultItem}>
+                    <span className={styles.resultLabel}>写了日记</span>
+                    <p className={styles.resultText}>{thinkingResult.narrative}</p>
+                  </div>
+                )}
+                {thinkingResult.memory && (
+                  <div className={styles.resultItem}>
+                    <span className={styles.resultLabel}>内心想法</span>
+                    <p className={styles.resultText}>{thinkingResult.memory}</p>
+                  </div>
+                )}
+                {thinkingResult.moodChange && <div className={styles.resultMeta}>情绪有所变化</div>}
+                {thinkingResult.nextWakeup && <div className={styles.resultMeta}>安排了下次思考：{thinkingResult.nextWakeup}</div>}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* 详情模态框 */}
+      {detailModal && (
+        <div className={styles.lockOverlay} onClick={() => setDetailModal(null)}>
+          <div className={styles.detailModal} onClick={e => e.stopPropagation()}>
+            <div className={styles.lockModalTitle}>{detailModal.title}</div>
+            <div className={styles.detailContent}>{detailModal.content}</div>
+            <button className={styles.btn} onClick={() => setDetailModal(null)}>关闭</button>
+          </div>
+        </div>
+      )}
+
+      {/* 了解更多 */}
+      <button className={styles.visitorMoreBtn} onClick={onShowDetail}>
+        了解更多关于 {soul.name || name} 的信息 &rarr;
+      </button>
     </div>
   )
 }

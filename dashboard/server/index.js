@@ -44,7 +44,7 @@ function getDB(name) {
 function scanWorkers() {
   if (!existsSync(DATA_DIR)) return []
   return readdirSync(DATA_DIR)
-    .filter(f => f.endsWith('.db'))
+    .filter(f => f.endsWith('.db') && !f.startsWith('_'))
     .map(f => f.replace('.db', ''))
 }
 
