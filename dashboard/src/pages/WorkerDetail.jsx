@@ -375,10 +375,20 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
   const [chatEnded, setChatEnded] = useState(false)
   const [chatWaiting, setChatWaiting] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
+  const chatTimerRef = useRef(null)
+
+  function startChatTimer() {
+    if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
+    chatTimerRef.current = setTimeout(() => {
+      setChatEnded(true)
+      setChatMessages(prev => [...prev, { role: 'system', content: `${soul.name || name} 已经走了` }])
+    }, 90000)
+  }
 
   async function sendChat() {
     const text = wakeupReason.trim()
     if (!text || chatWaiting) return
+    if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
     setChatMessages(prev => [...prev, { role: 'visitor', content: text }])
     setWakeupReason('')
     setChatWaiting(true)
@@ -391,19 +401,26 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
       })
       const data = await resp.json()
       if (data.error) {
-        setChatMessages(prev => [...prev, { role: 'system', content: data.error }])
+        setChatMessages(prev => [...prev, { role: 'system', content: `${soul.name || name} 已经走了` }])
+        setChatEnded(true)
       } else {
         setChatConvId(data.conversation_id)
         setChatMessages(prev => [...prev, { role: 'agent', content: data.reply }])
-        if (data.ended) setChatEnded(true)
+        if (data.ended) {
+          setChatEnded(true)
+        } else {
+          startChatTimer()
+        }
       }
     } catch (e) {
-      setChatMessages(prev => [...prev, { role: 'system', content: '连接失败' }])
+      setChatMessages(prev => [...prev, { role: 'system', content: `${soul.name || name} 已经走了` }])
+      setChatEnded(true)
     }
     setChatWaiting(false)
   }
 
   function resetChat() {
+    if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
     setChatMessages([])
     setChatConvId('')
     setChatEnded(false)

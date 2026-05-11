@@ -23,6 +23,7 @@ import (
 
 const (
 	SendTimeout      = 120 * time.Second
+	RecvTimeout      = 60 * time.Second
 	MaxRoundsPerConv = 30
 )
 

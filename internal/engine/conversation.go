@@ -47,7 +47,7 @@ func (e *Engine) buildConversationHandlers(convID, senderName string, todo *Todo
 			if err := e.router.Reply(convID, e.workerName, content, false); err != nil {
 				return "", err
 			}
-			nextMsg, err := e.router.WaitNextMessage(convID, msgrouter.SendTimeout)
+			nextMsg, err := e.router.WaitNextMessage(convID, msgrouter.RecvTimeout)
 			if err != nil {
 				return "回复已送达，但对方没有继续说话。对话自然结束。", ErrConversationDone
 			}
