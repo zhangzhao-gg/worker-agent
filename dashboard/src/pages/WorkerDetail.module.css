@@ -256,44 +256,52 @@
     "identity diary"
     "status   diary"
     "wakeup   events";
-  /* 木桌质感 */
+  /* 木桌质感 — 粗犷风化 */
   background:
-    /* 细木纹：密集竖条 */
+    /* 粗木纹：宽竖条纹 */
     repeating-linear-gradient(
-      90deg,
+      92deg,
       transparent 0px,
-      transparent 3px,
-      rgba(0,0,0,0.04) 3px,
-      rgba(0,0,0,0.04) 4px,
-      transparent 4px,
-      transparent 8px,
-      rgba(40,25,10,0.03) 8px,
-      rgba(40,25,10,0.03) 9px
+      transparent 5px,
+      rgba(0,0,0,0.07) 5px,
+      rgba(0,0,0,0.07) 7px,
+      transparent 7px,
+      transparent 14px,
+      rgba(30,15,5,0.06) 14px,
+      rgba(30,15,5,0.06) 16px
     ),
-    /* 宽木纹：年轮带 */
+    /* 粗年轮：宽带深沟 */
     repeating-linear-gradient(
-      88deg,
+      86deg,
       transparent 0px,
-      transparent 30px,
-      rgba(0,0,0,0.06) 30px,
-      rgba(0,0,0,0.06) 32px,
-      transparent 32px,
-      transparent 55px,
-      rgba(60,35,10,0.04) 55px,
-      rgba(60,35,10,0.04) 57px
+      transparent 18px,
+      rgba(0,0,0,0.12) 18px,
+      rgba(0,0,0,0.12) 21px,
+      transparent 21px,
+      transparent 45px,
+      rgba(40,20,5,0.09) 45px,
+      rgba(40,20,5,0.09) 49px,
+      transparent 49px,
+      transparent 70px,
+      rgba(0,0,0,0.07) 70px,
+      rgba(0,0,0,0.07) 72px
     ),
-    /* 颗粒噪点 */
-    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E"),
-    /* 基色渐变 */
+    /* 木节疤 */
+    radial-gradient(ellipse 30px 20px at 20% 35%, rgba(30,15,5,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 22px 16px at 75% 65%, rgba(25,12,3,0.14) 0%, transparent 65%),
+    radial-gradient(ellipse 18px 24px at 55% 15%, rgba(35,18,5,0.1) 0%, transparent 60%),
+    /* 粗颗粒噪点 */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='5' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E"),
+    /* 基色渐变 — 更深更粗犷 */
     linear-gradient(
       175deg,
-      #5c3a1e 0%,
-      #6b4423 15%,
-      #7a5230 35%,
-      #6e4825 55%,
-      #7f5632 75%,
-      #694020 90%,
-      #5a3818 100%
+      #4a2e15 0%,
+      #5c3a1e 12%,
+      #6b4423 30%,
+      #573518 50%,
+      #6e4825 65%,
+      #5a3818 80%,
+      #4a2a12 100%
     );
   border-radius: 6px;
   padding: 2.5rem 2.5rem;
@@ -342,15 +350,44 @@
 
 /* 纸片基础样式 */
 .paper {
-  background: var(--amb-paper, #d4c4a8);
-  background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px);
-  background-size: 100% 1.6rem;
+  background-color: var(--amb-paper, #d4c4a8);
+  background-image:
+    /* 横线纹 */
+    linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+    /* 咖啡渍斑 */
+    radial-gradient(ellipse 40px 35px at 85% 20%, rgba(120,70,30,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 30px 25px at 15% 75%, rgba(100,60,20,0.1) 0%, transparent 65%),
+    radial-gradient(ellipse 20px 20px at 60% 90%, rgba(90,55,15,0.08) 0%, transparent 60%),
+    /* 褶皱折痕 */
+    linear-gradient(155deg, transparent 40%, rgba(0,0,0,0.04) 40.5%, transparent 41%),
+    linear-gradient(25deg, transparent 60%, rgba(0,0,0,0.03) 60.3%, transparent 60.6%),
+    /* 边缘泛黄 */
+    radial-gradient(ellipse at center, transparent 50%, rgba(140,100,45,0.08) 90%),
+    /* 纸纤维噪点 */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 150 150' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23f)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 100% 1.6rem, auto, auto, auto, auto, auto, auto, auto;
   box-shadow:
-    1px 2px 4px rgba(0,0,0,0.3),
-    2px 4px 8px rgba(0,0,0,0.15);
+    1px 2px 5px rgba(0,0,0,0.35),
+    3px 5px 10px rgba(0,0,0,0.18),
+    inset 0 0 15px rgba(100,65,20,0.06);
   padding: 1.5rem 1.4rem;
   animation: paperIn 0.5s ease both;
-  transition: background 1.5s ease, box-shadow 0.3s ease, opacity 0.6s ease;
+  transition: background-color 1.5s ease, box-shadow 0.3s ease, opacity 0.6s ease;
+  position: relative;
+}
+.paper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(180,140,70,0.06) 0%,
+    transparent 30%,
+    transparent 70%,
+    rgba(120,80,30,0.08) 100%
+  );
+  pointer-events: none;
 }
 @keyframes paperIn {
   from { opacity: 0; }
@@ -662,18 +699,17 @@
 
 /* 了解更多 */
 .visitorMoreBtn {
-  width: 100%;
-  max-width: 960px;
-  padding: 0.6rem 1rem;
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
   font-family: var(--font);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
   color: var(--accent);
   background: transparent;
   border: 1px dashed rgba(139,94,60,0.3);
   cursor: pointer;
   transition: all 0.2s;
-  margin-top: 2rem;
+  margin-top: 0.6rem;
 }
 .visitorMoreBtn:hover {
   background: rgba(139,94,60,0.06);

@@ -551,6 +551,9 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
             <h1 className={styles.visitorName}>{soul.name || name}</h1>
             <div className={styles.visitorOccupation}>{soul.occupation}</div>
             <div className={styles.visitorMoodNarrative}>{moodNarrative(soul)}</div>
+            <button className={styles.visitorMoreBtn} onClick={onShowDetail}>
+              了解更多 &rarr;
+            </button>
           </div>
         </div>
 
@@ -691,10 +694,6 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
         </div>
       )}
 
-      {/* 了解更多 */}
-      <button className={styles.visitorMoreBtn} onClick={onShowDetail}>
-        了解更多关于 {soul.name || name} 的信息 &rarr;
-      </button>
     </div>
   )
 }
