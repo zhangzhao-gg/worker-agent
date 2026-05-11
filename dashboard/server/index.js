@@ -147,6 +147,28 @@ app.post('/api/workers/:name/wakeup', (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }) }
 })
 
+// ================================================================
+//  对话代理 → Go worker server :8080
+// ================================================================
+
+const WORKER_API = process.env.WORKER_API || 'http://127.0.0.1:8080'
+
+app.post('/api/workers/:name/chat', async (req, res) => {
+  const { content, conversation_id } = req.body
+  if (!content) return res.status(400).json({ error: 'content required' })
+  try {
+    const resp = await fetch(`${WORKER_API}/api/workers/${req.params.name}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, conversation_id: conversation_id || '' }),
+    })
+    const data = await resp.json()
+    res.status(resp.status).json(data)
+  } catch (e) {
+    res.status(502).json({ error: '无法连接 Worker 服务: ' + e.message })
+  }
+})
+
 app.put('/api/workers/:name', requireAdmin, (req, res) => {
   const dbPath = join(DATA_DIR, `${req.params.name}.db`)
   if (!existsSync(dbPath)) return res.status(404).json({ error: 'not found' })

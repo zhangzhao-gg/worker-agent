@@ -276,7 +276,6 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
   const [events, setEvents] = useState([])
   const [wakeups, setWakeups] = useState([])
   const [wakeupReason, setWakeupReason] = useState('')
-  const [wakeupMsg, setWakeupMsg] = useState('')
   const [showLockModal, setShowLockModal] = useState(false)
 
   const [tick, setTick] = useState(Date.now())
@@ -370,131 +369,45 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
     return { surface, paper, shadow, timeOfDay }
   }, [soul.mood])
 
-  const [isThinking, setIsThinking] = useState(false)
-  const [thinkingStarted, setThinkingStarted] = useState(false)
-  const [thinkingSteps, setThinkingSteps] = useState([])
-  const [thinkingResult, setThinkingResult] = useState(null)
-  const [manualWakeup, setManualWakeup] = useState(false)
-  const [shaking, setShaking] = useState(false)
-  const baselineIdRef = useRef(0)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatConvId, setChatConvId] = useState('')
+  const [chatEnded, setChatEnded] = useState(false)
+  const [chatWaiting, setChatWaiting] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
 
-  const TOOL_LABELS = {
-    get_city_temperature: '正在感知天气...',
-    get_food_status: '正在了解食物供应...',
-    get_city_announcements: '正在查看公告...',
-    get_my_work_assignment: '正在确认工作安排...',
-    get_recent_events: '正在回忆最近发生的事...',
-    get_memories: '正在回忆过去的想法...',
-    write_heartbeat_schedule: '正在安排今天的日程...',
-    update_heartbeat_schedule: '正在调整日程...',
-    schedule_wakeup: '正在安排下次思考时间...',
-    write_narrative: '正在写日记...',
-    write_memory: '正在记录内心想法...',
-    update_soul: '正在调整情绪状态...',
-    cancel_wakeup: '正在取消计划...',
-    TodoWrite: '正在整理思路...',
-  }
-
-  function extractToolName(content) {
-    if (!content) return null
-    const m = content.match(/"name"\s*:\s*"([^"]+)"/) || content.match(/^(\w+)\(/)
-    return m ? m[1] : null
-  }
-
-  // 持续轮询 reasoning，自动检测是否在思考
-  useEffect(() => {
-    const poll = setInterval(() => {
-      fetch(`/api/workers/${name}/reasoning?limit=100`)
-        .then(r => r.json())
-        .then(rows => {
-          if (!rows.length) return
-          const sorted = rows.sort((a, b) => a.id - b.id)
-
-          let targetLogs
-          if (manualWakeup) {
-            targetLogs = sorted.filter(r => r.id > baselineIdRef.current)
-            if (!targetLogs.length) return
-          } else {
-            const lastLog = sorted[sorted.length - 1]
-            targetLogs = sorted.filter(r => r.session_id === lastLog.session_id)
-          }
-
-          if (!targetLogs.length) return
-          const lastEntry = targetLogs[targetLogs.length - 1]
-          const finished = lastEntry.type === 'finish'
-
-          if (!finished) {
-            setIsThinking(true)
-            setThinkingStarted(true)
-            // 提取人话步骤
-            const steps = []
-            for (const log of targetLogs) {
-              if (log.type === 'tool_call') {
-                const toolName = extractToolName(log.content)
-                const label = TOOL_LABELS[toolName] || `正在执行 ${toolName}...`
-                if (!steps.length || steps[steps.length - 1] !== label) steps.push(label)
-              }
-            }
-            if (!steps.length) steps.push('正在思考...')
-            setThinkingSteps(steps.slice(-3))
-            setThinkingResult(null)
-          } else {
-            // 思考完成 — 提取结果
-            if (isThinking || manualWakeup) {
-              const result = { narrative: null, memory: null, moodChange: null, nextWakeup: null }
-              for (const log of targetLogs) {
-                if (log.type === 'tool_call') {
-                  const toolName = extractToolName(log.content)
-                  if (toolName === 'write_narrative') {
-                    const m = log.content.match(/"text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/)
-                    if (m) result.narrative = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
-                  }
-                  if (toolName === 'write_memory') {
-                    const m = log.content.match(/"text"\s*:\s*"([^"]*(?:\\.[^"]*)*)"/)
-                    if (m) result.memory = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"')
-                  }
-                  if (toolName === 'update_soul') result.moodChange = true
-                  if (toolName === 'schedule_wakeup') {
-                    const m = log.content.match(/"reason"\s*:\s*"([^"]*)"/)
-                    if (m) result.nextWakeup = m[1]
-                  }
-                }
-              }
-              setThinkingResult(result)
-              setIsThinking(false)
-              setManualWakeup(false)
-              // 刷新主数据
-              fetch(`/api/workers/${name}/narratives`).then(r => r.json()).then(setNarratives).catch(() => {})
-              fetch(`/api/workers/${name}/wakeups`).then(r => r.json()).then(setWakeups).catch(() => {})
-            }
-          }
-        })
-        .catch(() => {})
-    }, 2000)
-    return () => clearInterval(poll)
-  }, [name, manualWakeup, isThinking])
-
-  async function doVisitorWakeup() {
-    const reason = wakeupReason || '访客唤醒'
+  async function sendChat() {
+    const text = wakeupReason.trim()
+    if (!text || chatWaiting) return
+    setChatMessages(prev => [...prev, { role: 'visitor', content: text }])
+    setWakeupReason('')
+    setChatWaiting(true)
+    setChatEnded(false)
     try {
-      const rows = await fetch(`/api/workers/${name}/reasoning?limit=1`).then(r => r.json())
-      baselineIdRef.current = rows.length ? Math.max(...rows.map(r => r.id)) : 0
-
-      await fetch(`/api/workers/${name}/wakeup`, {
+      const resp = await fetch(`/api/workers/${name}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason })
+        body: JSON.stringify({ content: text, conversation_id: chatConvId })
       })
-      setWakeupReason('')
-      setManualWakeup(true)
-      setIsThinking(true)
-      setThinkingStarted(false)
-      setThinkingSteps([])
-      setThinkingResult(null)
-      setShaking(true)
-      setTimeout(() => setShaking(false), 500)
-    } catch (e) { setWakeupMsg('失败: ' + e.message); setTimeout(() => setWakeupMsg(''), 3000) }
+      const data = await resp.json()
+      if (data.error) {
+        setChatMessages(prev => [...prev, { role: 'system', content: data.error }])
+      } else {
+        setChatConvId(data.conversation_id)
+        setChatMessages(prev => [...prev, { role: 'agent', content: data.reply }])
+        if (data.ended) setChatEnded(true)
+      }
+    } catch (e) {
+      setChatMessages(prev => [...prev, { role: 'system', content: '连接失败' }])
+    }
+    setChatWaiting(false)
+  }
+
+  function resetChat() {
+    setChatMessages([])
+    setChatConvId('')
+    setChatEnded(false)
+    setNoteOpen(false)
   }
 
   return (
@@ -541,7 +454,7 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
       <button className={styles.visitorBack} onClick={onBack}>&larr; 返回</button>
 
       {/* 桌面 */}
-      <div className={`${styles.desk} ${isThinking ? styles.deskDimmed : ''} ${shaking ? styles.deskShake : ''}`}>
+      <div className={styles.desk}>
         {/* 身份纸片 */}
         <div className={`${styles.paper} ${styles.identityPaper}`} style={{ transform: 'rotate(-3deg) translate(-6px, 4px)' }}>
           <div className={styles.visitorAvatar}>
@@ -603,7 +516,8 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
           {events.length ? (
             events.slice(0, 3).map((ev, i) => (
               <div key={ev.id || i} className={styles.eventItem} onClick={() => setDetailModal({ title: '见闻', content: ev.content })}>
-                {ev.content.length > 60 ? ev.content.slice(0, 60) + '...' : ev.content}
+                <span className={styles.eventTime}>{fmtRelative(ev.timestamp)}</span>
+                {ev.content.length > 50 ? ev.content.slice(0, 50) + '...' : ev.content}
               </div>
             ))
           ) : (
@@ -611,77 +525,55 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
           )}
         </div>
 
-        {/* 唤醒区 */}
-        <div className={`${styles.paper} ${styles.wakeupPaper}`} style={{ transform: 'rotate(-2deg) translate(-5px, -3px)' }}>
-          <span className={styles.paperLabel}>轻敲桌面唤醒 TA</span>
-          <div className={styles.visitorWakeupAction}>
-            <input
-              value={wakeupReason}
-              onChange={e => setWakeupReason(e.target.value)}
-              placeholder="说点什么..."
-              className={styles.visitorWakeupInput}
-              onKeyDown={e => e.key === 'Enter' && doVisitorWakeup()}
-              disabled={isThinking}
-            />
-            <button onClick={doVisitorWakeup} className={styles.btn} disabled={isThinking}>
-              {isThinking ? '思考中' : '唤醒'}
-            </button>
-          </div>
-          {wakeupMsg && <div className={styles.msg}>{wakeupMsg}</div>}
+        {/* 角落便利贴 — 传纸条对话 */}
+        <div className={`${styles.stickyNote} ${noteOpen ? styles.stickyNoteOpen : ''}`}>
+          {!noteOpen && (
+            <div className={styles.stickyFolded} onClick={() => setNoteOpen(true)}>
+              传纸条 ✦
+            </div>
+          )}
+          {noteOpen && (
+            <div className={styles.stickyChat}>
+              {chatMessages.length > 0 && (
+                <div className={styles.chatFlow}>
+                  {chatMessages.map((msg, i) => (
+                    <div key={i} className={`${styles.chatBubble} ${styles[`chat_${msg.role}`]}`}>
+                      {msg.content}
+                    </div>
+                  ))}
+                  {chatWaiting && (
+                    <div className={`${styles.chatBubble} ${styles.chat_agent}`}>
+                      <span className={styles.waveText}>
+                        {'···'.split('').map((ch, i) => (
+                          <span key={i} style={{ animationDelay: `${i * 0.2}s` }}>{ch}</span>
+                        ))}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!chatEnded ? (
+                <div className={styles.stickyInputArea}>
+                  <input
+                    value={wakeupReason}
+                    onChange={e => setWakeupReason(e.target.value)}
+                    placeholder={chatWaiting ? '等 TA 回...' : '写点什么...'}
+                    className={styles.stickyInput}
+                    onKeyDown={e => e.key === 'Enter' && sendChat()}
+                    disabled={chatWaiting}
+                    autoFocus
+                  />
+                  <button className={styles.stickyBtn} onClick={sendChat} disabled={chatWaiting}>传</button>
+                </div>
+              ) : (
+                <div className={styles.chatEndedHint}>对话结束了</div>
+              )}
+              <button className={styles.stickyClose} onClick={resetChat}>✕</button>
+            </div>
+          )}
         </div>
 
       </div>
-
-      {/* 思考面板 — 浮于桌面之上 */}
-      {(isThinking || thinkingResult) && (
-        <div className={styles.thinkingPanel}>
-          {isThinking ? (
-            <>
-              <div className={styles.thinkingHeader}>
-                <span className={`${styles.statusDot} ${styles.dot_thinking}`} />
-                {thinkingStarted ? (
-                  <span className={styles.waveText}>
-                    {'正在思考'.split('').map((ch, i) => (
-                      <span key={i} style={{ animationDelay: `${i * 0.15}s` }}>{ch}</span>
-                    ))}
-                  </span>
-                ) : <span>等待唤醒...</span>}
-              </div>
-              <div className={styles.thinkingSteps}>
-                {thinkingSteps.map((step, i) => (
-                  <div key={i} className={`${styles.thinkingStep} ${i === thinkingSteps.length - 1 ? styles.stepActive : styles.stepDone}`}>
-                    {step}
-                  </div>
-                ))}
-                <div className={styles.thinkingCursor} />
-              </div>
-            </>
-          ) : thinkingResult && (
-            <>
-              <div className={styles.thinkingHeader}>
-                <span className={styles.statusDot} style={{ background: '#22c55e' }} />
-                <span>思考完成</span>
-              </div>
-              <div className={styles.thinkingResultBody}>
-                {thinkingResult.narrative && (
-                  <div className={styles.resultItem}>
-                    <span className={styles.resultLabel}>写了日记</span>
-                    <p className={styles.resultText}>{thinkingResult.narrative}</p>
-                  </div>
-                )}
-                {thinkingResult.memory && (
-                  <div className={styles.resultItem}>
-                    <span className={styles.resultLabel}>内心想法</span>
-                    <p className={styles.resultText}>{thinkingResult.memory}</p>
-                  </div>
-                )}
-                {thinkingResult.moodChange && <div className={styles.resultMeta}>情绪有所变化</div>}
-                {thinkingResult.nextWakeup && <div className={styles.resultMeta}>安排了下次思考：{thinkingResult.nextWakeup}</div>}
-              </div>
-            </>
-          )}
-        </div>
-      )}
 
       {/* 详情模态框 */}
       {detailModal && (
@@ -994,4 +886,20 @@ function fmtTime(s) {
     const d = new Date(s)
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ', ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
   } catch { return s }
+}
+
+function fmtRelative(s) {
+  if (!s) return ''
+  try {
+    const d = new Date(s)
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+    const diff = Math.round((today - target) / 86400000)
+    const period = d.getHours() < 12 ? '上午' : '下午'
+    if (diff === 0) return `今天${period}`
+    if (diff === 1) return `昨天${period}`
+    if (diff === 2) return `前天${period}`
+    return `${d.getMonth() + 1}/${d.getDate()} ${period}`
+  } catch { return '' }
 }

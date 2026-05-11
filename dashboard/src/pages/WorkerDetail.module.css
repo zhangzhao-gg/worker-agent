@@ -250,12 +250,12 @@
   max-width: 960px;
   display: grid;
   grid-template-columns: 1fr 1.4fr;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   gap: 2rem 2.5rem;
   grid-template-areas:
     "identity diary"
-    "status   diary"
-    "wakeup   events";
+    "status   events";
+  position: relative;
   /* 木桌质感 — 粗犷风化 */
   background:
     /* 粗木纹：宽竖条纹 */
@@ -320,33 +320,13 @@
       "identity"
       "status"
       "diary"
-      "events"
-      "wakeup";
+      "events";
     gap: 1.5rem;
     padding: 1.5rem;
     border-radius: 4px;
   }
 }
 
-/* 思考时桌面变暗 */
-.deskDimmed .paper {
-  opacity: 0.4;
-  filter: url(#paper-edge) blur(1px);
-  transition: opacity 0.6s ease, filter 0.6s ease;
-}
-
-/* 唤醒震动 */
-.deskShake {
-  animation: shake 0.4s ease;
-}
-@keyframes shake {
-  0%, 100% { transform: translate(0, 0); }
-  15% { transform: translate(-2px, 1px); }
-  30% { transform: translate(2px, -1px); }
-  45% { transform: translate(-1px, 2px); }
-  60% { transform: translate(1px, -1px); }
-  75% { transform: translate(-1px, 0px); }
-}
 
 /* 纸片基础样式 */
 .paper {
@@ -411,17 +391,18 @@
   gap: 1.2rem;
 }
 .visitorAvatar {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  border: 1px solid rgba(42,31,24,0.2);
+  width: 88px;
+  height: 88px;
+  border-radius: 2px;
+  border: 2px solid rgba(42,31,24,0.25);
+  box-shadow: 1px 1px 4px rgba(0,0,0,0.15), inset 0 0 6px rgba(0,0,0,0.04);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font);
-  font-size: 1.6rem;
+  font-size: 2rem;
   color: var(--accent);
-  background: #fff;
+  background: #f8f3ec;
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -597,57 +578,141 @@
   cursor: pointer;
 }
 .eventItem:last-child { border-bottom: none; }
+.eventTime { margin-right: 0.3rem; }
 
-/* 唤醒区 */
-.wakeupPaper { grid-area: wakeup; }
-.visitorWakeupAction {
-  display: flex;
-  gap: 0.5rem;
+/* ================================================================
+   角落便利贴 — 唤醒 + 思考流
+   ================================================================ */
+.stickyNote {
+  position: absolute;
+  bottom: 1.2rem;
+  right: 1.2rem;
+  z-index: 10;
+  background: #f5e6a3;
+  box-shadow: 2px 3px 8px rgba(0,0,0,0.25), inset 0 0 12px rgba(180,140,50,0.08);
+  padding: 0;
+  transform: rotate(2deg);
+  transition: all 0.3s ease;
+  min-width: 60px;
 }
-.visitorWakeupInput {
-  flex: 1;
-  border: 1px solid rgba(42,31,24,0.2);
-  background: rgba(255,255,255,0.4);
-  color: #1a1208;
-  padding: 0.5rem 0.75rem;
-  font-family: var(--font);
-  font-size: 0.8rem;
-  outline: none;
+.stickyNoteOpen {
+  min-width: 220px;
+  max-width: 280px;
+  transform: rotate(0.5deg);
 }
-.visitorWakeupInput:focus {
-  border-color: var(--accent);
-  background: rgba(255,255,255,0.6);
+@media (max-width: 768px) {
+  .stickyNote {
+    position: relative;
+    bottom: auto;
+    right: auto;
+    margin-top: 1rem;
+    transform: rotate(1deg);
+  }
 }
-.visitorWakeupInput::placeholder { color: rgba(42,31,24,0.35); }
 
-/* 思考面板 — 浮动纸片 */
-.thinkingPanel {
-  width: 100%;
-  max-width: 520px;
-  margin-top: 2rem;
-  background: var(--amb-paper, #d4c4a8);
-  background-image: linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px);
-  background-size: 100% 1.6rem;
-  box-shadow: 0 6px 24px rgba(26,20,16,0.2), inset 0 0 15px rgba(0,0,0,0.05);
-  padding: 1.5rem 1.8rem;
-  filter: url(#paper-edge);
-  animation: floatUp 0.5s ease both;
-  transform: rotate(-0.3deg);
-}
-@keyframes floatUp {
-  from { opacity: 0; transform: translateY(20px) rotate(0deg); }
-  to { opacity: 1; transform: translateY(0) rotate(-0.3deg); }
-}
-.thinkingHeader {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px dashed rgba(42,31,24,0.1);
+/* 折叠态 — 一个小触发标签 */
+.stickyFolded {
+  padding: 0.5rem 0.8rem;
   font-family: var(--font);
   font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  color: rgba(42,31,24,0.7);
+  letter-spacing: 0.06em;
+  color: rgba(80,50,10,0.7);
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.2s;
+}
+.stickyFolded:hover { color: rgba(80,50,10,1); }
+
+/* 展开输入态 */
+.stickyInputArea {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem 0.7rem;
+  animation: fadeIn 0.2s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.stickyInput {
+  flex: 1;
+  border: none;
+  border-bottom: 1px solid rgba(80,50,10,0.2);
+  background: transparent;
+  color: #3d2a0a;
+  padding: 0.3rem 0;
+  font-family: var(--font);
+  font-size: 0.78rem;
+  outline: none;
+}
+.stickyInput::placeholder { color: rgba(80,50,10,0.35); }
+.stickyBtn {
+  padding: 0.3rem 0.6rem;
+  font-family: var(--font);
+  font-size: 0.7rem;
+  color: rgba(80,50,10,0.8);
+  background: rgba(255,255,255,0.3);
+  border: 1px solid rgba(80,50,10,0.2);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.stickyBtn:hover { background: rgba(255,255,255,0.5); border-color: rgba(80,50,10,0.4); }
+
+/* 发送的消息 */
+.stickyMessage {
+  padding: 0.5rem 0.7rem 0;
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: rgba(80,50,10,0.6);
+  font-style: italic;
+}
+
+/* 对话流 */
+.stickyChat {
+  padding: 0.6rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  position: relative;
+}
+.chatFlow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+.chatBubble {
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  padding: 0.3rem 0.5rem;
+  border-radius: 3px;
+  max-width: 85%;
+  word-break: break-word;
+}
+.chat_visitor {
+  align-self: flex-end;
+  background: rgba(255,255,255,0.5);
+  color: #3d2a0a;
+}
+.chat_agent {
+  align-self: flex-start;
+  background: rgba(80,50,10,0.08);
+  color: #3d2a0a;
+}
+.chat_system {
+  align-self: center;
+  font-size: 0.68rem;
+  color: rgba(80,50,10,0.5);
+  font-style: italic;
+}
+.chatEndedHint {
+  text-align: center;
+  font-family: var(--font);
+  font-size: 0.65rem;
+  color: rgba(80,50,10,0.4);
+  padding: 0.3rem 0;
+  font-style: italic;
 }
 .waveText span {
   display: inline-block;
@@ -655,47 +720,23 @@
 }
 @keyframes wave {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  50% { transform: translateY(-2px); }
 }
-.thinkingSteps {
-  padding: 0.6rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-.thinkingStep {
-  font-family: var(--font-body);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  color: rgba(42,31,24,0.4);
-  animation: fadeIn 0.3s ease;
-}
-.stepActive {
-  color: rgba(42,31,24,0.8);
-  animation: stepPulse 1.5s ease-in-out infinite;
-}
-.stepDone { color: rgba(42,31,24,0.35); }
-@keyframes stepPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.thinkingCursor {
-  width: 6px;
-  height: 14px;
-  background: var(--accent);
-  animation: blink 1s step-end infinite;
-  margin-top: 0.2rem;
-}
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-/* 思考结果 */
-.thinkingResultBody {
-  padding: 0.6rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+/* 关闭按钮 */
+.stickyClose {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.4rem;
+  background: none;
+  border: none;
+  font-size: 0.7rem;
+  color: rgba(80,50,10,0.4);
+  cursor: pointer;
+  padding: 0.2rem;
+  line-height: 1;
 }
-.resultItem { border-left: 2px solid rgba(42,31,24,0.15); padding-left: 0.6rem; }
-.resultLabel { font-family: var(--font); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(42,31,24,0.5); display: block; margin-bottom: 0.15rem; }
-.resultText { font-family: var(--font-body); font-size: 0.82rem; line-height: 1.6; color: #1a1208; }
-.resultMeta { font-family: var(--font-body); font-size: 0.75rem; color: rgba(42,31,24,0.5); font-style: italic; }
+.stickyClose:hover { color: rgba(80,50,10,0.8); }
 
 /* 了解更多 */
 .visitorMoreBtn {

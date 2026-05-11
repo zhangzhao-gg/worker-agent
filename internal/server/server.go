@@ -171,6 +171,7 @@ func (s *Server) ListenAndServe(port int) error {
 	mux.HandleFunc("GET /api/workers/{name}", s.handleGet)
 	mux.HandleFunc("PUT /api/workers/{name}", s.handleUpdate)
 	mux.HandleFunc("POST /api/workers/{name}/wakeup", s.handleManualWakeup)
+	mux.HandleFunc("POST /api/workers/{name}/chat", s.handleChat)
 	mux.HandleFunc("POST /api/workers/{name}/event", s.handlePushEvent)
 	mux.HandleFunc("DELETE /api/workers/{name}", s.handleDelete)
 
@@ -339,6 +340,47 @@ func (s *Server) handleManualWakeup(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "wakeup_scheduled", "reason": body.Reason})
 	log.Printf("[server] 手动唤醒: %s, reason=%s", name, body.Reason)
+}
+
+// POST /api/workers/{name}/chat — 访客对话
+func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	slug := sanitizeName(name)
+
+	s.mu.RLock()
+	_, exists := s.workers[slug]
+	s.mu.RUnlock()
+
+	if !exists {
+		http.Error(w, "工人不存在: "+name, http.StatusNotFound)
+		return
+	}
+
+	var body struct {
+		Content        string `json:"content"`
+		ConversationID string `json:"conversation_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
+		http.Error(w, "content 为必填项", http.StatusBadRequest)
+		return
+	}
+
+	reply, err := s.msgRouter.SendAndWait("visitor", slug, body.Content, body.ConversationID, 120*time.Second)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		log.Printf("[server] chat 失败: %s, err=%v", name, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"reply":           reply.Content,
+		"ended":           reply.Ended,
+		"conversation_id": reply.ConversationID,
+	})
+	log.Printf("[server] chat: visitor → %s, ended=%v", name, reply.Ended)
 }
 
 // POST /api/workers/{name}/event — 城市推送事件
