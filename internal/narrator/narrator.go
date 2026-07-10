@@ -61,7 +61,6 @@ type Narrator struct {
 	db    *db.Database
 	llm   llm.Client
 	start StartFunc
-	log   func(int, string, string)
 }
 
 func New(database *db.Database, client llm.Client, start StartFunc) *Narrator {
@@ -70,7 +69,7 @@ func New(database *db.Database, client llm.Client, start StartFunc) *Narrator {
 
 func (n *Narrator) Resolve(req Request) Outcome {
 	sessionID := "narrator_" + time.Now().Format("20060102_150405")
-	n.log = func(round int, typ string, content string) {
+	logFn := func(round int, typ string, content string) {
 		_ = n.db.InsertReasoningLog(sessionID, round, typ, content)
 	}
 	log.Printf("[narrator] 收到联系人缺口: requester=%s target=%s message=%q", req.Requester, req.Target, req.Message)
@@ -81,13 +80,14 @@ func (n *Narrator) Resolve(req Request) Outcome {
 
 	prompt := systemPrompt()
 	input := requestText(req)
-	n.log(0, "system_prompt", prompt)
-	n.log(0, "input", input)
+	logFn(0, "system_prompt", prompt)
+	logFn(0, "input", input)
 
 	messages := []llm.Message{{Role: "user", Content: input}}
 	state := Outcome{}
 
 	for round := 1; round <= maxNarratorRounds; round++ {
+		log.Printf("[narrator] Round %d | messages=%d | target=%s", round, len(messages), req.Target)
 		resp, err := n.llm.Chat(prompt, messages, tools())
 		if err != nil {
 			log.Printf("[narrator] LLM 调用失败: target=%s err=%v", req.Target, err)
@@ -95,13 +95,16 @@ func (n *Narrator) Resolve(req Request) Outcome {
 		}
 		messages = append(messages, resp.Message)
 		if resp.Message.Content != "" {
-			n.log(round, "llm_text", resp.Message.Content)
+			logFn(round, "llm_text", resp.Message.Content)
 		}
-		if len(resp.Message.ToolCalls) == 0 {
+		if resp.StopReason != "tool_calls" || len(resp.Message.ToolCalls) == 0 {
+			logFn(round, "reminder", missingToolMessage)
 			messages = append(messages, llm.Message{Role: "user", Content: missingToolMessage})
 			continue
 		}
-		if done, out := n.runTools(req, &state, round, resp.Message.ToolCalls, &messages); done {
+		done, out, results := n.dispatchTools(req, &state, round, resp.Message.ToolCalls, logFn)
+		messages = append(messages, results...)
+		if done {
 			return n.record(req, out)
 		}
 	}
@@ -109,10 +112,11 @@ func (n *Narrator) Resolve(req Request) Outcome {
 	return n.record(req, Outcome{Kind: Ask, Question: askQuestion(req.Target), Reason: "叙事者未完成三工具流程"})
 }
 
-func (n *Narrator) runTools(req Request, state *Outcome, round int, calls []llm.ToolCall, messages *[]llm.Message) (bool, Outcome) {
+func (n *Narrator) dispatchTools(req Request, state *Outcome, round int, calls []llm.ToolCall, logFn func(int, string, string)) (bool, Outcome, []llm.Message) {
+	results := make([]llm.Message, 0, len(calls))
 	for _, call := range calls {
 		log.Printf("[narrator] tool: %s(%s)", call.Function.Name, call.Function.Arguments)
-		n.log(round, "tool_call", call.Function.Name+"("+call.Function.Arguments+")")
+		logFn(round, "tool_call", call.Function.Name+"("+call.Function.Arguments+")")
 		args := parseArgs(call.Function.Arguments)
 		result := ""
 
@@ -121,7 +125,9 @@ func (n *Narrator) runTools(req Request, state *Outcome, round int, calls []llm.
 			*state = applyDecision(req, *state, args)
 			switch state.Kind {
 			case Ask, Reject:
-				return true, *state
+				result = "decision=" + state.Kind
+				logFn(round, "tool_result", result)
+				return true, *state, results
 			case Create:
 				result = "decision=create; continue with write_character"
 			}
@@ -135,15 +141,16 @@ func (n *Narrator) runTools(req Request, state *Outcome, round int, calls []llm.
 				break
 			}
 			out := n.startCreated(req, *state)
-			return true, out
+			logFn(round, "tool_result", "start_agent: "+out.Kind)
+			return true, out, results
 		default:
 			result = "unknown tool"
 		}
 
-		n.log(round, "tool_result", result)
-		*messages = append(*messages, llm.Message{Role: "tool", Content: result, ToolCallID: call.ID})
+		logFn(round, "tool_result", result)
+		results = append(results, llm.Message{Role: "tool", Content: result, ToolCallID: call.ID})
 	}
-	return false, *state
+	return false, *state, results
 }
 
 func applyDecision(req Request, out Outcome, args map[string]any) Outcome {
