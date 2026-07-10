@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 internal/db, internal/city, internal/llm
+ * [INPUT]: 依赖 internal/db, internal/city, internal/llm，依赖 Engine.contactResolver 处理联系人缺口
  * [OUTPUT]: 对外提供 loadToolDefs() 和 Engine.buildHandlers()
  * [POS]: internal/engine 的工具注册表，12 个工具（2 感知 + 9 行动 + 1 终极）
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -69,6 +69,20 @@ func (e *Engine) buildHandlers(todo *TodoManager) ToolHandlerMap {
 			content, _ := input["content"].(string)
 			convID, _ := input["conversation_id"].(string)
 			content = stripThink(content)
+			if convID == "" && e.contactResolver != nil {
+				result, err := e.contactResolver.ResolveContact(ContactRequest{
+					Requester: e.workerName,
+					Target:    to,
+					Message:   content,
+					Database:  e.db,
+				})
+				if err != nil {
+					return "联系受阻：" + err.Error(), nil
+				}
+				if result != "" {
+					return result, nil
+				}
+			}
 			payload, err := e.router.SendAndWait(e.workerName, to, content, convID, 120*time.Second)
 			if err != nil {
 				return fmt.Sprintf("发送失败：%s", err.Error()), nil

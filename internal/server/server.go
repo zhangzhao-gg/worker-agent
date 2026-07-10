@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm
+ * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm, internal/narrator
  * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点 + 实时推理/对话占用状态 + 对话关闭端点
  * [POS]: internal/server 的唯一成员，纯 API + 协程管理 + 城市事件接收，Web UI 已分离至 cmd/dashboard
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -25,6 +25,7 @@ import (
 	"worker-agent/internal/engine"
 	"worker-agent/internal/llm"
 	"worker-agent/internal/msgrouter"
+	"worker-agent/internal/narrator"
 	"worker-agent/internal/worker"
 )
 
@@ -37,6 +38,7 @@ type Server struct {
 	cityAPI   *city.CityAPI
 	llmClient llm.Client
 	msgRouter *msgrouter.MessageRouter
+	narrator  *narrator.Narrator
 	workers   map[string]*runningWorker
 	mu        sync.RWMutex
 }
@@ -92,6 +94,7 @@ func New(dataDir string, cityAPI *city.CityAPI, llmClient llm.Client) *Server {
 		msgRouter: router,
 		workers:   make(map[string]*runningWorker),
 	}
+	s.initNarrator()
 
 	router.SetWakeupFn(func(workerName string, signal msgrouter.ConversationSignal) bool {
 		s.mu.RLock()
@@ -117,6 +120,16 @@ func New(dataDir string, cityAPI *city.CityAPI, llmClient llm.Client) *Server {
 	})
 
 	return s
+}
+
+func (s *Server) initNarrator() {
+	narratorDB, err := db.New(filepath.Join(s.dataDir, "_narrator.db"))
+	if err != nil {
+		log.Printf("[server] 创建叙事者 DB 失败: %v", err)
+		return
+	}
+	s.narrator = narrator.New(narratorDB, s.llmClient, s.createNarratedWorker)
+	log.Printf("[server] 叙事者已初始化")
 }
 
 // ================================================================
@@ -242,6 +255,126 @@ func (s *Server) handleCreate(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(workerInfo{Name: req.Name, Status: "running"})
 
 	log.Printf("[server] 创建工人: %s (%s)", req.Name, req.Occupation)
+}
+
+func (s *Server) ResolveContact(req engine.ContactRequest) (string, error) {
+	if strings.TrimSpace(req.Target) == "" {
+		return "联系受阻：目标为空", nil
+	}
+	if s.contactReachable(req.Target, req.Database) {
+		log.Printf("[contacts] 可直接联系: requester=%s target=%s", req.Requester, req.Target)
+		return "", nil
+	}
+	if rejected, reason, err := contactRejected(req.Target, req.Database); err != nil {
+		return "", err
+	} else if rejected {
+		log.Printf("[contacts] 叙事者曾拒绝: requester=%s target=%s reason=%s", req.Requester, req.Target, reason)
+		return fmt.Sprintf("叙事者拒绝让「%s」成为可联系角色：%s", req.Target, reason), nil
+	}
+
+	if s.narrator == nil {
+		log.Printf("[contacts] 叙事者未初始化: requester=%s target=%s", req.Requester, req.Target)
+		return fmt.Sprintf("叙事者暂时沉默。请先补充「%s」是谁，以及你为什么要联系他。", req.Target), nil
+	}
+
+	log.Printf("[contacts] 交给叙事者裁定: requester=%s target=%s message=%q", req.Requester, req.Target, req.Message)
+	soul, _ := req.Database.GetSoul()
+	memories, _ := req.Database.GetRecentMemories(8)
+	contacts, _ := req.Database.GetContacts()
+	outcome := s.narrator.Resolve(narrator.Request{
+		Requester:        req.Requester,
+		Target:           req.Target,
+		Message:          req.Message,
+		RequesterSoul:    soul,
+		RequesterMemory:  memories,
+		RequesterContact: contacts,
+	})
+	log.Printf("[contacts] 叙事者裁定: requester=%s target=%s outcome=%s worker=%s reason=%s question=%s",
+		req.Requester, req.Target, outcome.Kind, outcome.Character.Name, outcome.Reason, outcome.Question)
+	_ = saveContactOutcome(req.Target, req.Database, outcome)
+	return outcome.Message, nil
+}
+
+func (s *Server) contactReachable(name string, database *db.Database) bool {
+	if s.workerRunning(name) {
+		return true
+	}
+	contact, ok, _ := database.GetContact(name)
+	return ok && contact.Status == "active" && contact.TargetWorker != "" && s.workerRunning(contact.TargetWorker)
+}
+
+func contactRejected(name string, database *db.Database) (bool, string, error) {
+	contact, ok, err := database.GetContact(name)
+	if err != nil || !ok || contact.Status != "rejected" {
+		return false, "", err
+	}
+	return true, contact.RejectionReason, nil
+}
+
+func saveContactOutcome(name string, database *db.Database, outcome narrator.Outcome) error {
+	contact := db.Contact{Name: name, Kind: "unresolved", Status: "unresolved", CreatedBy: "narrator"}
+	switch outcome.Kind {
+	case narrator.Create:
+		contact.Kind = "worker"
+		contact.Status = "active"
+		contact.Relation = outcome.Character.Relation
+		contact.TargetWorker = outcome.Character.Name
+		contact.Notes = outcome.Character.Notes
+	case narrator.Reject:
+		contact.Status = "rejected"
+		contact.RejectionReason = outcome.Reason
+	default:
+		contact.Notes = outcome.Question
+	}
+	log.Printf("[contacts] 写回联系人: name=%s status=%s kind=%s target=%s", contact.Name, contact.Status, contact.Kind, contact.TargetWorker)
+	return database.UpsertContact(contact)
+}
+
+func (s *Server) createNarratedWorker(profile narrator.CharacterProfile) error {
+	if strings.TrimSpace(profile.Name) == "" {
+		return fmt.Errorf("角色名为空")
+	}
+
+	slug := sanitizeName(profile.Name)
+	s.mu.RLock()
+	_, running := s.workers[slug]
+	s.mu.RUnlock()
+	if running {
+		log.Printf("[narrator] 工人已存在，跳过创建: %s", profile.Name)
+		return nil
+	}
+
+	dbPath := filepath.Join(s.dataDir, slug+".db")
+	database, err := db.New(dbPath)
+	if err != nil {
+		return err
+	}
+
+	if _, err := database.GetSoul(); err != nil {
+		soul := db.Soul{
+			Name:        profile.Name,
+			Occupation:  firstNonEmpty(profile.Occupation, "新伦敦居民"),
+			Background:  profile.Background,
+			Personality: profile.Personality,
+			SpeechStyle: profile.SpeechStyle,
+			ValuesDesc:  profile.ValuesDesc,
+			Family:      profile.Family,
+			Mood:        50,
+			Hope:        50,
+			Grievance:   0,
+			BodyStatus:  "健康",
+		}
+		if err := database.InitSoul(soul); err != nil {
+			database.Close()
+			return err
+		}
+		firstWakeup := time.Now().Add(5 * time.Second).Format(time.RFC3339)
+		_ = database.InsertWakeup(firstWakeup, "叙事者让你进入新伦敦，开始理解自己的处境")
+	}
+
+	s.startWorker(slug, dbPath, database)
+	log.Printf("[server] 叙事者创建工人: %s", profile.Name)
+	return nil
 }
 
 // GET /api/workers — 列出所有工人
@@ -493,6 +626,7 @@ func (s *Server) startWorker(name string, dbPath string, database *db.Database) 
 	log.Printf("[server] startWorker: name=%s, llmClient=%v", name, s.llmClient != nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	eng := engine.New(database, s.cityAPI, s.llmClient, s.msgRouter, name)
+	eng.SetContactResolver(s)
 	wakeupCh := make(chan worker.WakeupSignal, 16)
 	reasoning := &atomic.Bool{}
 
@@ -545,4 +679,20 @@ func corsMiddleware(next http.Handler) http.Handler {
 func sanitizeName(name string) string {
 	replacer := strings.NewReplacer(" ", "_", "/", "_", "\\", "_", ".", "_")
 	return strings.ToLower(replacer.Replace(name))
+}
+
+func (s *Server) workerRunning(name string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.workers[sanitizeName(name)]
+	return ok
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/llm, internal/msgrouter
- * [OUTPUT]: 对外提供 Engine struct 及 Run()/RunConversation() 方法，对话模式提示回复前先处理必要记忆，失败时释放等待方
+ * [OUTPUT]: 对外提供 Engine struct、ContactResolver 接口及 Run()/RunConversation() 方法，对话模式提示回复前先处理必要记忆，失败时释放等待方
  * [POS]: internal/engine 的入口，推理引擎骨架，持有 db/cityAPI/llm/router 引用
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -27,11 +27,23 @@ var ErrConversationDone = errors.New("对话回复完成")
 // ================================================================
 
 type Engine struct {
-	db         *db.Database
-	cityAPI    *city.CityAPI
-	llm        llm.Client
-	router     *msgrouter.MessageRouter
-	workerName string
+	db              *db.Database
+	cityAPI         *city.CityAPI
+	llm             llm.Client
+	router          *msgrouter.MessageRouter
+	workerName      string
+	contactResolver ContactResolver
+}
+
+type ContactRequest struct {
+	Requester string
+	Target    string
+	Message   string
+	Database  *db.Database
+}
+
+type ContactResolver interface {
+	ResolveContact(ContactRequest) (string, error)
 }
 
 // RunContext 业务层注入的上下文
@@ -48,6 +60,10 @@ type RunContext struct {
 
 func New(database *db.Database, cityAPI *city.CityAPI, llmClient llm.Client, router *msgrouter.MessageRouter, workerName string) *Engine {
 	return &Engine{db: database, cityAPI: cityAPI, llm: llmClient, router: router, workerName: workerName}
+}
+
+func (e *Engine) SetContactResolver(resolver ContactResolver) {
+	e.contactResolver = resolver
 }
 
 // ================================================================

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 database/sql, github.com/mattn/go-sqlite3
- * [OUTPUT]: 对外提供 Database struct 及全部 CRUD 方法
+ * [OUTPUT]: 对外提供 Database struct 及全部 CRUD 方法，包含 contacts 与 narrator_decisions
  * [POS]: internal/db 的唯一成员，数据层核心，被心跳协程/唤醒协程/推理引擎共同消费
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -83,6 +83,31 @@ type ReasoningLog struct {
 	Round     int
 	Type      string
 	Content   string
+}
+
+type Contact struct {
+	ID              int64
+	Name            string
+	Kind            string
+	Relation        string
+	TargetWorker    string
+	Notes           string
+	Status          string
+	CreatedBy       string
+	RejectionReason string
+	CreatedAt       string
+	UpdatedAt       string
+}
+
+type NarratorDecision struct {
+	ID               int64
+	Requester        string
+	RequestedName    string
+	RequestedMessage string
+	Decision         string
+	Reason           string
+	CreatedWorker    string
+	Timestamp        string
 }
 
 // ================================================================
@@ -178,6 +203,29 @@ func (d *Database) createTables() error {
 		round      INTEGER NOT NULL,
 		type       TEXT NOT NULL,
 		content    TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS contacts (
+		id               INTEGER PRIMARY KEY AUTOINCREMENT,
+		name             TEXT NOT NULL UNIQUE,
+		kind             TEXT NOT NULL DEFAULT 'unresolved',
+		relation         TEXT DEFAULT '',
+		target_worker    TEXT DEFAULT '',
+		notes            TEXT DEFAULT '',
+		status           TEXT NOT NULL DEFAULT 'unresolved',
+		created_by       TEXT DEFAULT 'system',
+		rejection_reason TEXT DEFAULT '',
+		created_at       TEXT NOT NULL,
+		updated_at       TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS narrator_decisions (
+		id                INTEGER PRIMARY KEY AUTOINCREMENT,
+		requester         TEXT NOT NULL,
+		requested_name    TEXT NOT NULL,
+		requested_message TEXT NOT NULL,
+		decision          TEXT NOT NULL,
+		reason            TEXT DEFAULT '',
+		created_worker    TEXT DEFAULT '',
+		timestamp         TEXT NOT NULL
 	);`
 	_, err := d.db.Exec(ddl)
 	return err
@@ -538,6 +586,76 @@ func (d *Database) CountPersistentMemories() (int, error) {
 
 func (d *Database) DeleteMemory(id int64) error {
 	_, err := d.db.Exec("DELETE FROM memories WHERE id = ?", id)
+	return err
+}
+
+// ================================================================
+//  Contacts
+// ================================================================
+
+func (d *Database) UpsertContact(c Contact) error {
+	now := time.Now().Format(time.RFC3339)
+	_, err := d.db.Exec(`
+		INSERT INTO contacts (name, kind, relation, target_worker, notes, status, created_by, rejection_reason, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(name) DO UPDATE SET
+			kind = excluded.kind,
+			relation = excluded.relation,
+			target_worker = excluded.target_worker,
+			notes = excluded.notes,
+			status = excluded.status,
+			created_by = excluded.created_by,
+			rejection_reason = excluded.rejection_reason,
+			updated_at = excluded.updated_at`,
+		c.Name, c.Kind, c.Relation, c.TargetWorker, c.Notes, c.Status, c.CreatedBy, c.RejectionReason, now, now)
+	return err
+}
+
+func (d *Database) GetContact(name string) (Contact, bool, error) {
+	var c Contact
+	err := d.db.QueryRow(`SELECT id, name, kind, relation, target_worker, notes, status, created_by, rejection_reason, created_at, updated_at
+		FROM contacts WHERE name = ?`, name).Scan(
+		&c.ID, &c.Name, &c.Kind, &c.Relation, &c.TargetWorker, &c.Notes, &c.Status,
+		&c.CreatedBy, &c.RejectionReason, &c.CreatedAt, &c.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return Contact{}, false, nil
+	}
+	return c, err == nil, err
+}
+
+func (d *Database) GetContacts() ([]Contact, error) {
+	rows, err := d.db.Query(`SELECT id, name, kind, relation, target_worker, notes, status, created_by, rejection_reason, created_at, updated_at
+		FROM contacts ORDER BY updated_at DESC, id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var contacts []Contact
+	for rows.Next() {
+		var c Contact
+		if err := rows.Scan(&c.ID, &c.Name, &c.Kind, &c.Relation, &c.TargetWorker, &c.Notes,
+			&c.Status, &c.CreatedBy, &c.RejectionReason, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		contacts = append(contacts, c)
+	}
+	return contacts, rows.Err()
+}
+
+func (d *Database) InsertNarratorDecision(decision NarratorDecision) error {
+	_, err := d.db.Exec(`INSERT INTO narrator_decisions
+		(requester, requested_name, requested_message, decision, reason, created_worker, timestamp)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		decision.Requester,
+		decision.RequestedName,
+		decision.RequestedMessage,
+		decision.Decision,
+		decision.Reason,
+		decision.CreatedWorker,
+		time.Now().Format(time.RFC3339),
+	)
 	return err
 }
 
