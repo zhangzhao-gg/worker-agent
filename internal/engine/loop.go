@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/llm
- * [OUTPUT]: 对外提供 agentLoop 函数
+ * [OUTPUT]: 对外提供 agentLoop 函数，执行工具调用并将终止型对话工具排在最后
  * [POS]: internal/engine 的推理循环，参考 s_full.py agent_loop 移植
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -127,7 +127,8 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 		log.Printf("│ 🔧 工具调用: %d 个", len(resp.Message.ToolCalls))
 		usedTodo := false
 
-		for i, call := range resp.Message.ToolCalls {
+		toolCalls := orderToolCalls(resp.Message.ToolCalls)
+		for i, call := range toolCalls {
 			name := call.Function.Name
 			args := call.Function.Arguments
 
@@ -200,6 +201,27 @@ func agentLoop(cfg loopConfig, initialMessage string) error {
 	log.Printf("║ ✘ AGENT LOOP 超限  |  达到最大轮次 %d", maxRounds)
 	log.Println("╚══════════════════════════════════════════════════════════")
 	return fmt.Errorf("推理达到最大轮次 %d", maxRounds)
+}
+
+func orderToolCalls(calls []llm.ToolCall) []llm.ToolCall {
+	if len(calls) < 2 {
+		return calls
+	}
+
+	ordered := make([]llm.ToolCall, 0, len(calls))
+	var terminal []llm.ToolCall
+	for _, call := range calls {
+		if isTerminalConversationTool(call.Function.Name) {
+			terminal = append(terminal, call)
+			continue
+		}
+		ordered = append(ordered, call)
+	}
+	return append(ordered, terminal...)
+}
+
+func isTerminalConversationTool(name string) bool {
+	return name == "reply_message" || name == "end_conversation"
 }
 
 func truncate(s string, n int) string {

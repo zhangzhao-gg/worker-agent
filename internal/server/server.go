@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm
- * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点 + 实时推理/对话占用状态
+ * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点 + 实时推理/对话占用状态 + 对话关闭端点
  * [POS]: internal/server 的唯一成员，纯 API + 协程管理 + 城市事件接收，Web UI 已分离至 cmd/dashboard
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -173,6 +173,7 @@ func (s *Server) ListenAndServe(port int) error {
 	mux.HandleFunc("PUT /api/workers/{name}", s.handleUpdate)
 	mux.HandleFunc("POST /api/workers/{name}/wakeup", s.handleManualWakeup)
 	mux.HandleFunc("POST /api/workers/{name}/chat", s.handleChat)
+	mux.HandleFunc("POST /api/workers/{name}/chat/close", s.handleCloseChat)
 	mux.HandleFunc("POST /api/workers/{name}/event", s.handlePushEvent)
 	mux.HandleFunc("DELETE /api/workers/{name}", s.handleDelete)
 
@@ -404,6 +405,21 @@ func busyMessage(chatWith string) string {
 		return "对方正在跟别人聊天"
 	}
 	return "对方正在沉思"
+}
+
+// POST /api/workers/{name}/chat/close — 访客关闭对话
+func (s *Server) handleCloseChat(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		ConversationID string `json:"conversation_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.ConversationID == "" {
+		http.Error(w, "conversation_id 为必填项", http.StatusBadRequest)
+		return
+	}
+
+	closed := s.msgRouter.CloseConversation(body.ConversationID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"closed": closed})
 }
 
 // POST /api/workers/{name}/event — 城市推送事件

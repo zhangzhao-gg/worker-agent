@@ -6,11 +6,11 @@ Vite + React + Express + better-sqlite3，直连 `data/*.db` 读写，不依赖 
 ## 架构
 
 ```
-server/index.js  — Express API，直连 SQLite 读写，安全码中间件保护写操作，代理 Worker 实时聊天状态
+server/index.js  — Express API，直连 SQLite 读写，安全码中间件保护写操作，代理 Worker 实时聊天状态与关闭
 src/main.jsx     — React 入口
 src/App.jsx      — 路由（hash-free pushState）
 src/index.css    — 全局样式：CSS 变量、墙面肌理、水渍色斑、暗角、字体定义
-src/pages/       — WorkerList（列表）+ WorkerDetail（访客视图 + 详情六标签 + 传纸条忙碌态）
+src/pages/       — WorkerList（列表）+ WorkerDetail（访客视图 + 详情六标签 + 传纸条忙碌态/关闭释放）
 index.html       — SVG filter 定义（paper-edge 撕裂边缘）+ vignette 暗角元素
 public/fonts/    — Special Elite 打字机字体 TTF
 public/avatars/  — 工人头像静态文件

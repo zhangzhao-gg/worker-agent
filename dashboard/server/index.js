@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 better-sqlite3 读写 data/*.db, express 提供 HTTP
- * [OUTPUT]: REST API 供前端消费，读取数据 + 编辑人设 + 重置 + 手动唤醒 + 代理实时聊天状态
+ * [OUTPUT]: REST API 供前端消费，读取数据 + 编辑人设 + 重置 + 手动唤醒 + 代理实时聊天状态/关闭
  * [POS]: dashboard 后端唯一入口，直连 SQLite，不依赖 Worker 进程
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -172,6 +172,22 @@ app.post('/api/workers/:name/chat', async (req, res) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content, conversation_id: conversation_id || '' }),
+    })
+    const data = await resp.json()
+    res.status(resp.status).json(data)
+  } catch (e) {
+    res.status(502).json({ error: '无法连接 Worker 服务: ' + e.message })
+  }
+})
+
+app.post('/api/workers/:name/chat/close', async (req, res) => {
+  const { conversation_id } = req.body
+  if (!conversation_id) return res.status(400).json({ error: 'conversation_id required' })
+  try {
+    const resp = await fetch(`${WORKER_API}/api/workers/${req.params.name}/chat/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_id }),
     })
     const data = await resp.json()
     res.status(resp.status).json(data)

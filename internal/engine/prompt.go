@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/db.Soul, RunContext
- * [OUTPUT]: 对外提供 buildSystemPrompt, buildInitialMessage 函数
+ * [OUTPUT]: 对外提供 buildSystemPrompt, buildConversationPrompt, buildInitialMessage 函数
  * [POS]: internal/engine 的 prompt 组装器，从 soul + context 动态生成 system prompt 和初始消息
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -113,6 +113,7 @@ func buildConversationPrompt(ctx RunContext, senderName string) string {
 
 	b.WriteString(fmt.Sprintf(`%s 正在和你说话。
 用 reply_message 回复后对方可能继续说话，用 end_conversation 说最后一句并结束。
+调用 reply_message/end_conversation 后，本轮思考会交给对方；如果对话里出现值得以后记住的信息、承诺、人物关系或重要情绪，必须先调用 write_memory，再回复。
 像真人一样对话——该回就回，该结束就结束，不要刻意延续话题。
 你可以用 recall 回忆相关记忆，用 write_memory 记下重要对话内容。`, senderName))
 

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 database/sql, github.com/mattn/go-sqlite3
- * [OUTPUT]: 对外提供 MessageRouter struct，ConversationSignal，Message，ReplyPayload 类型
+ * [OUTPUT]: 对外提供 MessageRouter struct，ConversationSignal，Message，ReplyPayload 类型及 CloseConversation 释放对话等待
  * [POS]: internal/msgrouter 的唯一成员，agent 间多轮同步对话的核心路由器
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -9,6 +9,7 @@ package msgrouter
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -25,7 +26,10 @@ const (
 	SendTimeout      = 120 * time.Second
 	RecvTimeout      = 60 * time.Second
 	MaxRoundsPerConv = 30
+	closedMessage    = "\x00closed"
 )
+
+var ErrConversationClosed = errors.New("对话已被对方关闭")
 
 // ================================================================
 //  类型定义
@@ -226,9 +230,28 @@ func (r *MessageRouter) WaitNextMessage(convID string, timeout time.Duration) (s
 
 	select {
 	case msg := <-recvCh:
+		if msg == closedMessage {
+			return "", ErrConversationClosed
+		}
 		return msg, nil
 	case <-time.After(timeout):
 		return "", fmt.Errorf("等待对方继续对话超时")
+	}
+}
+
+func (r *MessageRouter) CloseConversation(convID string) bool {
+	r.mu.Lock()
+	recvCh, ok := r.receivers[convID]
+	r.mu.Unlock()
+	if !ok {
+		return false
+	}
+
+	select {
+	case recvCh <- closedMessage:
+		return true
+	default:
+		return false
 	}
 }
 

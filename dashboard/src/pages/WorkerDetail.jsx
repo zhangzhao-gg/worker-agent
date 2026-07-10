@@ -397,6 +397,7 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
   const [chatWaiting, setChatWaiting] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
   const chatTimerRef = useRef(null)
+  const chatSessionRef = useRef(0)
   const isBusy = liveStatus.reasoning && !liveStatus.chatting_with
   const isChatting = !!liveStatus.chatting_with
   const canStartChat = !isBusy && !isChatting
@@ -420,6 +421,7 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
       return
     }
     if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
+    const chatSession = chatSessionRef.current
     setChatMessages(prev => [...prev, { role: 'visitor', content: text }])
     setWakeupReason('')
     setChatWaiting(true)
@@ -431,6 +433,7 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
         body: JSON.stringify({ content: text, conversation_id: chatConvId })
       })
       const data = await resp.json()
+      if (chatSession !== chatSessionRef.current) return
       if (data.error) {
         setChatMessages(prev => [...prev, { role: 'system', content: data.reasoning ? chatBusyText(soul, name, data) : data.error }])
         setChatEnded(true)
@@ -444,17 +447,28 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
         }
       }
     } catch (e) {
+      if (chatSession !== chatSessionRef.current) return
       setChatMessages(prev => [...prev, { role: 'system', content: `${soul.name || name} 已经走了` }])
       setChatEnded(true)
     }
+    if (chatSession !== chatSessionRef.current) return
     setChatWaiting(false)
   }
 
   function resetChat() {
     if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
+    chatSessionRef.current += 1
+    if (chatConvId) {
+      fetch(`/api/workers/${name}/chat/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: chatConvId })
+      }).catch(() => {})
+    }
     setChatMessages([])
     setChatConvId('')
     setChatEnded(false)
+    setChatWaiting(false)
     setNoteOpen(false)
   }
 
