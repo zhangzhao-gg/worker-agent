@@ -1,3 +1,10 @@
+/**
+ * [INPUT]: 依赖 dashboard/src/index.css 的全局变量与 WorkerDetail.jsx 的 CSS Modules className
+ * [OUTPUT]: 对外提供 WorkerDetail 页面全部局部样式，包括详情布局、访客视图、传纸条对话与忙碌态
+ * [POS]: dashboard/src/pages 的工人详情样式表，只服务 WorkerDetail.jsx
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+
 .container { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface); }
 .nav { display: flex; justify-content: space-between; align-items: center; padding: 1.2rem 3rem; border-bottom: 1px solid var(--border); background: var(--surface-alt); }
 .logo { font-family: var(--font); font-size: 1.2rem; font-weight: bold; letter-spacing: 0.15em; color: var(--accent); text-transform: uppercase; opacity: 0.9; }
@@ -507,6 +514,11 @@
   font-size: 0.9rem;
   color: #1a1208;
 }
+.ellipsis {
+  display: inline-block;
+  width: 1.2em;
+  text-align: left;
+}
 .ellipsis::after {
   content: '';
   animation: dots 1.5s steps(4, end) infinite;
@@ -622,6 +634,12 @@
   transition: color 0.2s;
 }
 .stickyFolded:hover { color: rgba(80,50,10,1); }
+.stickyDisabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  font-style: italic;
+}
+.stickyDisabled:hover { color: rgba(80,50,10,0.7); }
 
 /* 展开输入态 */
 .stickyInputArea {

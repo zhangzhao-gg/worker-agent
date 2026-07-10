@@ -1,3 +1,10 @@
+/**
+ * [INPUT]: 依赖 React hooks、Worker REST API、WorkerDetail.module.css
+ * [OUTPUT]: 对外提供 WorkerDetail 页面组件，呈现访客视图、详情视图、管理操作与传纸条对话
+ * [POS]: dashboard/src/pages 的工人详情页，承接列表页路由并消费后端聚合数据
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import styles from './WorkerDetail.module.css'
 
@@ -279,6 +286,7 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
   const [showLockModal, setShowLockModal] = useState(false)
 
   const [tick, setTick] = useState(Date.now())
+  const [liveStatus, setLiveStatus] = useState({ reasoning: false, chatting_with: '' })
 
   useEffect(() => {
     const load = () => {
@@ -290,6 +298,19 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
     }
     load()
     const timer = setInterval(load, 15000)
+    return () => clearInterval(timer)
+  }, [name])
+
+  useEffect(() => {
+    const poll = () => fetch(`/api/workers/${name}/live-status`)
+      .then(r => {
+        if (!r.ok) throw new Error('worker offline')
+        return r.json()
+      })
+      .then(setLiveStatus)
+      .catch(() => setLiveStatus({ reasoning: true, chatting_with: '', offline: true }))
+    poll()
+    const timer = setInterval(poll, 5000)
     return () => clearInterval(timer)
   }, [name])
 
@@ -376,6 +397,11 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
   const [chatWaiting, setChatWaiting] = useState(false)
   const [detailModal, setDetailModal] = useState(null)
   const chatTimerRef = useRef(null)
+  const isBusy = liveStatus.reasoning && !liveStatus.chatting_with
+  const isChatting = !!liveStatus.chatting_with
+  const canStartChat = !isBusy && !isChatting
+  const canChat = canStartChat || chatConvId
+  const foldedText = canChat ? '传纸条 ✦' : chatBusyText(soul, name, liveStatus)
 
   function startChatTimer() {
     if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
@@ -388,6 +414,11 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
   async function sendChat() {
     const text = wakeupReason.trim()
     if (!text || chatWaiting) return
+    if (!chatConvId && !canStartChat) {
+      setChatMessages(prev => [...prev, { role: 'system', content: chatBusyText(soul, name, liveStatus) }])
+      setChatEnded(true)
+      return
+    }
     if (chatTimerRef.current) clearTimeout(chatTimerRef.current)
     setChatMessages(prev => [...prev, { role: 'visitor', content: text }])
     setWakeupReason('')
@@ -401,7 +432,7 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
       })
       const data = await resp.json()
       if (data.error) {
-        setChatMessages(prev => [...prev, { role: 'system', content: `${soul.name || name} 已经走了` }])
+        setChatMessages(prev => [...prev, { role: 'system', content: data.reasoning ? chatBusyText(soul, name, data) : data.error }])
         setChatEnded(true)
       } else {
         setChatConvId(data.conversation_id)
@@ -545,8 +576,11 @@ function VisitorView({ name, worker, onBack, onShowDetail, codeInput, setCodeInp
         {/* 角落便利贴 — 传纸条对话 */}
         <div className={`${styles.stickyNote} ${noteOpen ? styles.stickyNoteOpen : ''}`}>
           {!noteOpen && (
-            <div className={styles.stickyFolded} onClick={() => setNoteOpen(true)}>
-              传纸条 ✦
+            <div
+              className={`${styles.stickyFolded} ${!canChat ? styles.stickyDisabled : ''}`}
+              onClick={() => canChat && setNoteOpen(true)}
+            >
+              {foldedText}
             </div>
           )}
           {noteOpen && (
@@ -873,6 +907,12 @@ function moodNarrative(soul) {
   const hope = pick(soul.hope, ['对未来感到绝望', '有些迷茫', '对未来没什么想法', '对未来有所期待', '对未来充满希望'])
   const griev = pick(soul.grievance, ['', '，偶尔会有点不满', '，对现状有些不满', '，对现状相当愤怒', '，对现状极度愤怒'])
   return `现在${mood}，${hope}${griev}。`
+}
+
+function chatBusyText(soul, name, status) {
+  const who = soul.name || name
+  if (status.offline) return `${who}暂时联系不上`
+  return status.chatting_with ? `${who}正在跟别人聊天` : `${who}正在沉思`
 }
 
 function Field({ label, value }) {

@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 internal/db.Database, internal/engine.Engine
+ * [INPUT]: 依赖 internal/db.Database, internal/engine.Engine, sync/atomic 暴露实时推理与对话占用状态
  * [OUTPUT]: 对外提供 RunWakeup 函数
  * [POS]: internal/worker 的唤醒调度协程，工人的「大脑入口」——只在关键时刻醒来
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -23,7 +23,7 @@ import (
 //  唤醒调度协程
 // ================================================================
 
-func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, wakeupCh <-chan WakeupSignal, wg *sync.WaitGroup, reasoning *atomic.Bool) {
+func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, wakeupCh <-chan WakeupSignal, wg *sync.WaitGroup, reasoning *atomic.Bool, chatWith *atomic.Value) {
 	defer wg.Done()
 	log.Println("[唤醒] 协程启动")
 
@@ -32,16 +32,24 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 
 	var pendingConvs []*ConversationContext
 
+	processConversation := func(conv *ConversationContext) {
+		reasoning.Store(true)
+		chatWith.Store(conv.SenderName)
+		defer func() {
+			chatWith.Store("")
+			reasoning.Store(false)
+		}()
+		if err := handleConversationWakeup(database, eng, conv); err != nil {
+			log.Printf("[唤醒] 对话处理失败: %v", err)
+		}
+	}
+
 	drainPending := func() {
 		for len(pendingConvs) > 0 {
 			conv := pendingConvs[0]
 			pendingConvs = pendingConvs[1:]
 			log.Printf("[唤醒] 处理排队对话: from=%s, conv=%s", conv.SenderName, conv.ConversationID)
-			reasoning.Store(true)
-			if err := handleConversationWakeup(database, eng, conv); err != nil {
-				log.Printf("[唤醒] 对话处理失败: %v", err)
-			}
-			reasoning.Store(false)
+			processConversation(conv)
 		}
 	}
 
@@ -55,11 +63,7 @@ func RunWakeup(ctx context.Context, database *db.Database, eng *engine.Engine, w
 					pendingConvs = append(pendingConvs, signal.Conversation)
 					continue
 				}
-				reasoning.Store(true)
-				if err := handleConversationWakeup(database, eng, signal.Conversation); err != nil {
-					log.Printf("[唤醒] 对话处理失败: %v", err)
-				}
-				reasoning.Store(false)
+				processConversation(signal.Conversation)
 				continue
 			}
 

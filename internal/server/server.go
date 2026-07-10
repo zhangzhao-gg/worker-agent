@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm
- * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点
+ * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点 + 实时推理/对话占用状态
  * [POS]: internal/server 的唯一成员，纯 API + 协程管理 + 城市事件接收，Web UI 已分离至 cmd/dashboard
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -42,12 +42,13 @@ type Server struct {
 }
 
 type runningWorker struct {
-	Name      string             `json:"name"`
-	Status    string             `json:"status"`
-	DBPath    string             `json:"db_path"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	DBPath    string `json:"db_path"`
 	database  *db.Database
 	wakeupCh  chan<- worker.WakeupSignal
 	reasoning *atomic.Bool
+	chatWith  atomic.Value
 	cancel    context.CancelFunc
 }
 
@@ -272,10 +273,13 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 
 	soul, _ := rw.database.GetSoul()
 
+	chatWith, _ := rw.chatWith.Load().(string)
 	resp := map[string]any{
-		"name":      rw.Name,
-		"status":    rw.Status,
-		"soul":      soul,
+		"name":          rw.Name,
+		"status":        rw.Status,
+		"soul":          soul,
+		"reasoning":     rw.reasoning.Load(),
+		"chatting_with": chatWith,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -348,7 +352,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	slug := sanitizeName(name)
 
 	s.mu.RLock()
-	_, exists := s.workers[slug]
+	rw, exists := s.workers[slug]
 	s.mu.RUnlock()
 
 	if !exists {
@@ -362,6 +366,18 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Content == "" {
 		http.Error(w, "content 为必填项", http.StatusBadRequest)
+		return
+	}
+
+	if body.ConversationID == "" && rw.reasoning.Load() {
+		chatWith, _ := rw.chatWith.Load().(string)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":         busyMessage(chatWith),
+			"reasoning":     true,
+			"chatting_with": chatWith,
+		})
 		return
 	}
 
@@ -381,6 +397,13 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		"conversation_id": reply.ConversationID,
 	})
 	log.Printf("[server] chat: visitor → %s, ended=%v", name, reply.Ended)
+}
+
+func busyMessage(chatWith string) string {
+	if chatWith != "" {
+		return "对方正在跟别人聊天"
+	}
+	return "对方正在沉思"
 }
 
 // POST /api/workers/{name}/event — 城市推送事件
@@ -474,7 +497,7 @@ func (s *Server) startWorker(name string, dbPath string, database *db.Database) 
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go worker.RunHeartbeat(ctx, database, s.cityAPI, s.llmClient, name, wakeupCh, &wg)
-	go worker.RunWakeup(ctx, database, eng, wakeupCh, &wg, reasoning)
+	go worker.RunWakeup(ctx, database, eng, wakeupCh, &wg, reasoning, &rw.chatWith)
 
 	// 监控协程退出
 	go func() {
