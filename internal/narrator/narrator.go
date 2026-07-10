@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 internal/db 持久化叙事决策，依赖 internal/llm 执行三工具叙事流程
+ * [INPUT]: 依赖 internal/db 持久化叙事决策，依赖 internal/llm 执行多轮三工具叙事流程
  * [OUTPUT]: 对外提供 Narrator、Request、Outcome、CharacterProfile 和 Resolve()
  * [POS]: internal/narrator 的系统级 agent，不参与普通 worker 心跳，只负责联系人缺口的世界补全
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -19,9 +19,11 @@ import (
 )
 
 const (
-	Ask    = "ask"
-	Create = "create"
-	Reject = "reject"
+	Ask                = "ask"
+	Create             = "create"
+	Reject             = "reject"
+	maxNarratorRounds  = 8
+	missingToolMessage = "继续。create 必须依次调用 write_character 和 start_agent；ask/reject 可直接结束。"
 )
 
 type Request struct {
@@ -82,51 +84,66 @@ func (n *Narrator) Resolve(req Request) Outcome {
 	n.log(0, "system_prompt", prompt)
 	n.log(0, "input", input)
 
-	resp, err := n.llm.Chat(prompt, []llm.Message{{Role: "user", Content: input}}, tools())
-	if err != nil {
-		log.Printf("[narrator] LLM 调用失败: target=%s err=%v", req.Target, err)
-		return n.record(req, Outcome{Kind: Ask, Question: askQuestion(req.Target), Reason: err.Error()})
-	}
-	if resp.Message.Content != "" {
-		n.log(1, "llm_text", resp.Message.Content)
+	messages := []llm.Message{{Role: "user", Content: input}}
+	state := Outcome{}
+
+	for round := 1; round <= maxNarratorRounds; round++ {
+		resp, err := n.llm.Chat(prompt, messages, tools())
+		if err != nil {
+			log.Printf("[narrator] LLM 调用失败: target=%s err=%v", req.Target, err)
+			return n.record(req, Outcome{Kind: Ask, Question: askQuestion(req.Target), Reason: err.Error()})
+		}
+		messages = append(messages, resp.Message)
+		if resp.Message.Content != "" {
+			n.log(round, "llm_text", resp.Message.Content)
+		}
+		if len(resp.Message.ToolCalls) == 0 {
+			messages = append(messages, llm.Message{Role: "user", Content: missingToolMessage})
+			continue
+		}
+		if done, out := n.runTools(req, &state, round, resp.Message.ToolCalls, &messages); done {
+			return n.record(req, out)
+		}
 	}
 
-	out, started := n.runTools(req, resp.Message.ToolCalls)
-	if out.Kind == "" {
-		out = Outcome{Kind: Ask, Question: askQuestion(req.Target)}
-	}
-	if out.Kind == Create && !started {
-		out = n.startCreated(req, out)
-	}
-	return n.record(req, out)
+	return n.record(req, Outcome{Kind: Ask, Question: askQuestion(req.Target), Reason: "叙事者未完成三工具流程"})
 }
 
-func (n *Narrator) runTools(req Request, calls []llm.ToolCall) (Outcome, bool) {
-	var out Outcome
-	started := false
-
+func (n *Narrator) runTools(req Request, state *Outcome, round int, calls []llm.ToolCall, messages *[]llm.Message) (bool, Outcome) {
 	for _, call := range calls {
 		log.Printf("[narrator] tool: %s(%s)", call.Function.Name, call.Function.Arguments)
-		n.log(1, "tool_call", call.Function.Name+"("+call.Function.Arguments+")")
+		n.log(round, "tool_call", call.Function.Name+"("+call.Function.Arguments+")")
 		args := parseArgs(call.Function.Arguments)
+		result := ""
 
 		switch call.Function.Name {
 		case "decide_character":
-			out = applyDecision(req, out, args)
-		case "write_character":
-			out.Kind = Create
-			out.Character = characterFromArgs(req.Target, args)
-			n.log(1, "tool_result", "character written")
-		case "start_agent":
-			if out.Character.Name == "" {
-				out.Character.Name = textArg(args, "name")
+			*state = applyDecision(req, *state, args)
+			switch state.Kind {
+			case Ask, Reject:
+				return true, *state
+			case Create:
+				result = "decision=create; continue with write_character"
 			}
-			out = n.startCreated(req, out)
-			started = out.Kind == Create
-			n.log(1, "tool_result", out.Message)
+		case "write_character":
+			state.Kind = Create
+			state.Character = characterFromArgs(req.Target, args)
+			result = "character written; continue with start_agent"
+		case "start_agent":
+			if !state.Character.complete() {
+				result = "start rejected: call write_character with complete profile first"
+				break
+			}
+			out := n.startCreated(req, *state)
+			return true, out
+		default:
+			result = "unknown tool"
 		}
+
+		n.log(round, "tool_result", result)
+		*messages = append(*messages, llm.Message{Role: "tool", Content: result, ToolCallID: call.ID})
 	}
-	return out, started
+	return false, *state
 }
 
 func applyDecision(req Request, out Outcome, args map[string]any) Outcome {
@@ -152,7 +169,7 @@ func applyDecision(req Request, out Outcome, args map[string]any) Outcome {
 }
 
 func (n *Narrator) startCreated(req Request, out Outcome) Outcome {
-	if out.Character.Name == "" {
+	if !out.Character.complete() {
 		out.Kind = Ask
 		out.Question = askQuestion(req.Target)
 		return out
@@ -163,6 +180,17 @@ func (n *Narrator) startCreated(req Request, out Outcome) Outcome {
 	out.Kind = Create
 	out.Message = fmt.Sprintf("叙事者让「%s」进入了新伦敦。你现在可以再次联系他。", out.Character.Name)
 	return out
+}
+
+func (c CharacterProfile) complete() bool {
+	return c.Name != "" &&
+		c.Occupation != "" &&
+		c.Background != "" &&
+		c.Personality != "" &&
+		c.SpeechStyle != "" &&
+		c.ValuesDesc != "" &&
+		c.Family != "" &&
+		c.Relation != ""
 }
 
 func (n *Narrator) record(req Request, out Outcome) Outcome {
