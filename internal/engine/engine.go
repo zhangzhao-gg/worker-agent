@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/llm, internal/msgrouter
- * [OUTPUT]: 对外提供 Engine struct 及 Run()/RunConversation() 方法，对话模式提示回复前先处理必要记忆
+ * [OUTPUT]: 对外提供 Engine struct 及 Run()/RunConversation() 方法，对话模式提示回复前先处理必要记忆，失败时释放等待方
  * [POS]: internal/engine 的入口，推理引擎骨架，持有 db/cityAPI/llm/router 引用
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -124,5 +124,11 @@ func (e *Engine) RunConversation(convID, senderName, message string, ctx RunCont
 	initialMsg := fmt.Sprintf("当前时间：%s\n\n%s 对你说：「%s」\n\n请思考后回复。若这句话值得以后记住，先用 write_memory 记录，再用 reply_message 回复并继续对话，或用 end_conversation 说最后一句话结束对话。",
 		time.Now().Format("2006-01-02 15:04"), senderName, message)
 
-	return agentLoop(loopCfg, initialMsg)
+	if err := agentLoop(loopCfg, initialMsg); err != nil {
+		if e.router != nil {
+			e.router.Reply(convID, e.workerName, "[暂时无法回复]", true)
+		}
+		return err
+	}
+	return nil
 }
