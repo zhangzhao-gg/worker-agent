@@ -116,7 +116,8 @@ func (e *Engine) handleSenseCity() (string, error) {
 	temp, _ := e.cityAPI.GetCityTemperature()
 	food, _ := e.cityAPI.GetFoodStatus()
 	announcements, _ := e.cityAPI.GetCityAnnouncements()
-	work, _ := e.cityAPI.GetMyWorkAssignment("")
+	soul, _ := e.db.GetSoul()
+	work, _ := e.cityAPI.GetMyWorkAssignment(soul.Name, soul.Occupation)
 
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf("气温：%s\n", temp))

@@ -363,7 +363,7 @@ func (c *CityAPI) PostNarrative(text string)
 func (c *CityAPI) GetCityTemperature() string
 func (c *CityAPI) GetFoodStatus() string
 func (c *CityAPI) GetCityAnnouncements() []string
-func (c *CityAPI) GetMyWorkAssignment() string
+func (c *CityAPI) GetMyWorkAssignment(workerID string, occupation string) (string, error)
 ```
 
 > 城市 API 的具体 HTTP 协议待补充。

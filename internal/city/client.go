@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 net/http, encoding/json, math/rand
+ * [INPUT]: 依赖 net/http, math/rand, strings
  * [OUTPUT]: 对外提供 CityAPI struct 及全部城市交互方法（含 mock 模式）
  * [POS]: internal/city 的唯一成员，工人与外部世界的唯一 HTTP 接口
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
@@ -10,6 +10,7 @@ package city
 import (
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -94,9 +95,9 @@ func (c *CityAPI) GetCityAnnouncements() ([]string, error) {
 	return nil, nil
 }
 
-func (c *CityAPI) GetMyWorkAssignment(workerID string) (string, error) {
+func (c *CityAPI) GetMyWorkAssignment(workerID string, occupation string) (string, error) {
 	if c.mock {
-		return "你今天的任务是在南矿区采煤。早八点到岗，晚六点收工。注意安全，服从工头调度。", nil
+		return mockWorkAssignment(occupation), nil
 	}
 	// TODO: 实现 HTTP 调用
 	return "", nil
@@ -131,12 +132,18 @@ var mockAnnouncements = []string{
 	"通告：医疗站缺少药品，请有多余草药的居民捐献",
 }
 
-var mockAssignments = []string{
-	"今天的任务是在南矿区采煤，注意安全",
-	"你被分配到锅炉房维护工作，确保供暖正常",
-	"今天去伐木场帮忙，暴风雪前需要储备木材",
-	"被安排到建筑工地，新住房需要更多人手",
-	"今天的任务是在仓库整理物资，清点库存",
+type workRule struct {
+	Keywords   []string
+	Assignment string
+}
+
+var mockWorkRules = []workRule{
+	{[]string{"矿工", "采煤"}, "你今天的任务是在南矿区采煤。早八点到岗，晚六点收工。注意安全，服从工头调度。"},
+	{[]string{"缝补", "裁缝", "工服"}, "你今天的任务是在锅炉房缝补工服。早八点到岗，晚六点收工。优先修补矿工破损的厚外套和手套，确保下井人员能御寒。"},
+	{[]string{"锅炉"}, "你今天的任务是在锅炉房协助维护。早八点到岗，晚六点收工。听从锅炉工调度，确保供暖稳定。"},
+	{[]string{"医生", "护士", "医护"}, "你今天的任务是在医疗站值守。早八点到岗，晚六点收工。处理冻伤、咳嗽和工伤，药品要节省使用。"},
+	{[]string{"工程师", "技师", "机械"}, "你今天的任务是在工坊检修设备。早八点到岗，晚六点收工。优先处理影响供暖和采煤的机械故障。"},
+	{[]string{"猎人", "侦察", "探险"}, "你今天的任务是外出侦察与搜集物资。早八点到岗，晚六点收工。结伴行动，注意狼群和暴风雪。"},
 }
 
 var mockNews = []string{
@@ -155,6 +162,24 @@ func (c *CityAPI) mockHeartbeat() HeartbeatResponse {
 		return HeartbeatResponse{News: pickRandom(mockNews[5:])}
 	}
 	return HeartbeatResponse{}
+}
+
+func mockWorkAssignment(occupation string) string {
+	for _, rule := range mockWorkRules {
+		if hasAny(occupation, rule.Keywords) {
+			return rule.Assignment
+		}
+	}
+	return "你今天的任务是在城市公共岗位轮值。早八点到岗，晚六点收工。服从调度，协助物资搬运、清扫积雪和临时修缮。"
+}
+
+func hasAny(text string, keywords []string) bool {
+	for _, keyword := range keywords {
+		if strings.Contains(text, keyword) {
+			return true
+		}
+	}
+	return false
 }
 
 func pickRandom(options []string) string {

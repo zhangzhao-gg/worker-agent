@@ -82,7 +82,7 @@ func (e *Engine) Run(trigger string, ctx RunContext) error {
 	}
 
 	if ctx.WorkAssignment == "" {
-		ctx.WorkAssignment, _ = e.cityAPI.GetMyWorkAssignment(ctx.Soul.Name)
+		ctx.WorkAssignment, _ = e.cityAPI.GetMyWorkAssignment(ctx.Soul.Name, ctx.Soul.Occupation)
 	}
 
 	sessionID := fmt.Sprintf("%s_%s", ctx.Soul.Name, time.Now().Format("20060102_150405"))
