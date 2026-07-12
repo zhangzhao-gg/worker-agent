@@ -163,10 +163,6 @@ func (s *Server) Resume() {
 			continue
 		}
 
-		wakeupTime := time.Now().Add(5 * time.Second).Format(time.RFC3339)
-		database.InsertWakeup(wakeupTime, "刚才愣了一下，重新审视所有唤醒计划，确保未来有合理的唤醒安排")
-		log.Printf("[server] 为 %s 插入恢复审视唤醒", name)
-
 		s.startWorker(name, dbPath, database)
 		log.Printf("[server] 恢复工人: %s", name)
 	}
