@@ -77,7 +77,7 @@ export default function WorkerList({ onSelect }) {
                   )}
                   <figcaption>
                     {lead.name}<br />
-                    <span>Activity: {statusText(lead.status)}</span>
+                    <span>档案状态：{statusText(lead.status)}</span>
                   </figcaption>
                 </figure>
               </div>
@@ -87,12 +87,12 @@ export default function WorkerList({ onSelect }) {
           </div>
 
           <aside className={styles.statistics}>
-            <h3>Vital Statistics</h3>
+            <h3>状态统计</h3>
             {lead ? (
               <>
-                <Metric label="Mood Index" value={lead.mood} />
-                <Metric label="Hope Variance" value={lead.hope} />
-                <Metric label="Grievance Quota" value={lead.grievance} />
+                <Metric label="心情指数" value={lead.mood} />
+                <Metric label="希望指数" value={lead.hope} />
+                <Metric label="不满指数" value={lead.grievance} />
               </>
             ) : (
               <p className={styles.muted}>No active registry entries.</p>
@@ -116,9 +116,9 @@ export default function WorkerList({ onSelect }) {
               )}
               <p>
                 {w.name} 被记录为{w.occupation || '新伦敦居民'}。
-                当前状态为 {statusText(w.status)}，希望与不满在寒冷中继续拉扯。
+                当前档案状态为{statusText(w.status)}，希望与不满在寒冷中继续拉扯。
               </p>
-              <div className={styles.dispatchStatus}>Status: {statusText(w.status)}</div>
+              <div className={styles.dispatchStatus}>状态：{statusText(w.status)}</div>
               <div className={styles.miniMetrics}>
                 <span>心情 {clampMetric(w.mood)}</span>
                 <span>希望 {clampMetric(w.hope)}</span>
@@ -156,9 +156,9 @@ function clampMetric(value) {
 }
 
 function statusText(status) {
-  if (status === 'running') return 'On Duty'
-  if (status === 'thinking' || status === 'reasoning') return 'In Deliberation'
-  return 'Awaiting Orders'
+  if (status === 'running') return '观察中'
+  if (status === 'thinking' || status === 'reasoning') return '思考中'
+  return '休眠中'
 }
 
 function dayOfYear(date) {
