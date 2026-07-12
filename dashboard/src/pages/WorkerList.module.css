@@ -1,9 +1,20 @@
+/**
+ * [INPUT]: 依赖 dashboard/src/index.css 的全局变量与 WorkerList.jsx 的 CSS Modules className
+ * [OUTPUT]: 对外提供 WorkerList 首页样式，包括导航、今日公告、工人卡片网格与指标条
+ * [POS]: dashboard/src/pages 的首页列表样式表，只服务 WorkerList.jsx
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+
 .container { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface); }
 .nav { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 3rem; border-bottom: 1px solid var(--border); background: var(--surface-alt); }
 .logo { font-family: var(--font); font-size: 1.2rem; font-weight: bold; letter-spacing: 0.15em; color: var(--accent); text-transform: uppercase; opacity: 0.9; }
 .label { font-family: var(--font); font-size: 0.65rem; letter-spacing: 0.15em; color: var(--muted); text-transform: uppercase; }
 .main { flex: 1; padding: 3rem; max-width: 1200px; margin: 0 auto; width: 100%; }
-.title { font-family: var(--font); font-size: 1.4rem; font-weight: normal; margin-bottom: 2rem; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+.title { font-family: var(--font); font-size: 1.4rem; font-weight: normal; margin-bottom: 1.2rem; letter-spacing: 0.08em; color: var(--accent); text-transform: uppercase; }
+.announcementBoard { border: 1px solid var(--border); background: var(--surface-alt); padding: 1rem 1.2rem; margin-bottom: 2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.announcementLabel { font-family: var(--font); font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); display: block; margin-bottom: 0.45rem; }
+.announcementText { font-family: var(--font-body); font-size: 0.95rem; line-height: 1.7; color: var(--ink); margin: 0; }
+.announcementEmpty { font-style: italic; color: var(--muted); font-size: 0.9rem; margin: 0; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem; }
 .card { border: 1px solid var(--border); padding: 1.5rem; cursor: pointer; transition: all 0.15s; display: flex; gap: 1rem; align-items: flex-start; background: var(--surface-alt); box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
 .card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(139,94,60,0.12); }

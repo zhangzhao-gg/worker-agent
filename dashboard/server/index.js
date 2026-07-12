@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 better-sqlite3 读写 data/*.db, express 提供 HTTP
- * [OUTPUT]: REST API 供前端消费，读取数据 + 编辑人设 + 重置 + 手动唤醒 + 代理实时聊天状态/关闭
+ * [OUTPUT]: REST API 供前端消费，读取数据 + 今日公告代理 + 编辑人设 + 重置 + 手动唤醒 + 代理实时聊天状态/关闭
  * [POS]: dashboard 后端唯一入口，直连 SQLite，不依赖 Worker 进程
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -152,6 +152,17 @@ app.post('/api/workers/:name/wakeup', (req, res) => {
 // ================================================================
 
 const WORKER_API = process.env.WORKER_API || 'http://127.0.0.1:8080'
+
+app.get('/api/announcements', async (req, res) => {
+  try {
+    const resp = await fetch(`${WORKER_API}/api/city/announcements`)
+    if (!resp.ok) return res.status(resp.status).json({ announcements: [] })
+    const data = await resp.json()
+    res.json({ announcements: data.announcements || [] })
+  } catch (e) {
+    res.status(502).json({ announcements: [], error: 'worker service unavailable' })
+  }
+})
 
 app.get('/api/workers/:name/live-status', async (req, res) => {
   try {

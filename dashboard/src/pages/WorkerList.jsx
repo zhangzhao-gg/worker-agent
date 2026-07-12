@@ -1,13 +1,31 @@
+/**
+ * [INPUT]: 依赖 React hooks、Dashboard Worker/公告 API、WorkerList.module.css
+ * [OUTPUT]: 对外提供 WorkerList 页面组件，展示今日城市公告与全部工人入口
+ * [POS]: dashboard/src/pages 的首页列表页，被 App.jsx 在根路径渲染
+ * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ */
+
 import { useState, useEffect } from 'react'
 import styles from './WorkerList.module.css'
 
 export default function WorkerList({ onSelect }) {
   const [workers, setWorkers] = useState([])
+  const [announcements, setAnnouncements] = useState([])
 
   useEffect(() => {
     const load = () => fetch('/api/workers').then(r => r.json()).then(setWorkers).catch(() => {})
     load()
     const timer = setInterval(load, 10000)
+    return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const load = () => fetch('/api/announcements')
+      .then(r => r.json())
+      .then(data => setAnnouncements(data.announcements || []))
+      .catch(() => setAnnouncements([]))
+    load()
+    const timer = setInterval(load, 60000)
     return () => clearInterval(timer)
   }, [])
 
@@ -19,6 +37,16 @@ export default function WorkerList({ onSelect }) {
       </nav>
       <main className={styles.main}>
         <h1 className={styles.title}>Worker Registry</h1>
+        <section className={styles.announcementBoard}>
+          <span className={styles.announcementLabel}>今日公告</span>
+          {announcements.length ? (
+            announcements.map((text, i) => (
+              <p key={i} className={styles.announcementText}>{text}</p>
+            ))
+          ) : (
+            <p className={styles.announcementEmpty}>暂无公告</p>
+          )}
+        </section>
         <div className={styles.grid}>
           {workers.map(w => (
             <div key={w.name} className={styles.card} onClick={() => onSelect(w.name)}>

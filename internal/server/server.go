@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 internal/db, internal/city, internal/engine, internal/worker, internal/llm, internal/narrator
- * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 工人生命周期管理 + 事件推送端点 + 实时推理/对话占用状态 + 对话关闭端点
+ * [OUTPUT]: 对外提供 Server struct，HTTP API 入口 + 城市公告读取 + 工人生命周期管理 + 事件推送端点 + 实时推理/对话占用状态 + 对话关闭端点
  * [POS]: internal/server 的唯一成员，纯 API + 协程管理 + 城市事件接收，Web UI 已分离至 cmd/dashboard
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -189,6 +189,7 @@ func (s *Server) ListenAndServe(port int) error {
 	mux.HandleFunc("POST /api/workers/{name}/chat/close", s.handleCloseChat)
 	mux.HandleFunc("POST /api/workers/{name}/event", s.handlePushEvent)
 	mux.HandleFunc("DELETE /api/workers/{name}", s.handleDelete)
+	mux.HandleFunc("GET /api/city/announcements", s.handleCityAnnouncements)
 
 	addr := fmt.Sprintf(":%d", port)
 	log.Printf("[server] 启动 HTTP 服务: %s", addr)
@@ -389,6 +390,21 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(list)
+}
+
+// GET /api/city/announcements — 读取今日城市公告
+func (s *Server) handleCityAnnouncements(w http.ResponseWriter, r *http.Request) {
+	announcements, err := s.cityAPI.GetCityAnnouncements()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	if announcements == nil {
+		announcements = []string{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"announcements": announcements})
 }
 
 // GET /api/workers/{name} — 查询单个工人
